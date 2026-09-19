@@ -19,7 +19,7 @@ from django.urls import path, include
 from django.http import JsonResponse
 from django.contrib.auth import get_user_model
 
-# --- TRUCO PARA CREAR EL ADMIN SIN CONSOLA ---
+
 def crear_admin_secreto(request):
     User = get_user_model()
     try:
