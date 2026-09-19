@@ -9,8 +9,7 @@ class IsPasswordNotTemporal(BasePermission):
     message = "Debes cambiar tu contraseña temporal antes de continuar realizando acciones."
 
     def has_permission(self, request, view):
-        # Si el usuario no está autenticado, dejamos que IsAuthenticated o AllowAny decidan,
-        # pero si está autenticado, verificamos que su flag sea False.
+        
         if request.user and request.user.is_authenticated:
             return not getattr(request.user, 'pass_temporal_flag', False)
         return True
