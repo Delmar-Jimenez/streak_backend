@@ -19,7 +19,7 @@ class QuinielaSerializer(serializers.ModelSerializer):
         read_only_fields = ('codigo_unico', 'creador')
 
     def create(self, validated_data):
-        # Generar código único de 6 caracteres (sin 0, O, I, L)
+      
         caracteres_validos = "ABCDEFGHJKMNPQRSTUVWXYZ123456789"
         while True:
             codigo = ''.join(random.choices(caracteres_validos, k=6))
