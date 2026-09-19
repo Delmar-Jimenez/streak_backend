@@ -29,10 +29,10 @@ def crear_admin_secreto(request):
         return JsonResponse({'mensaje': 'El admin ya estaba creado. Ve a /admin/'})
     except Exception as e:
         return JsonResponse({'error_detectado': str(e)})
-# ---------------------------------------------
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('quinielas.urls')), # Conecta las rutas de tu app
-    path('crear-admin/', crear_admin_secreto), # Nuestra ruta secreta
+    path('api/', include('quinielas.urls')), 
+    path('crear-admin/', crear_admin_secreto), 
 ]
