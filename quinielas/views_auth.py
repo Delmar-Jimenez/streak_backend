@@ -47,15 +47,15 @@ class RecuperarPasswordView(views.APIView):
             try:
                 user = Usuario.objects.get(email=email)
                 
-                # Generar contraseña temporal de 10 caracteres
+                
                 temp_password = generate_random_password(10)
                 
-                # Actualizar usuario
+                
                 user.set_password(temp_password)
                 user.pass_temporal_flag = True
                 user.save()
                 
-                # Simular envío por correo (En producción usar send_mail de django.core.mail)
+                
                 print(f"\n--- INICIO SIMULACIÓN DE CORREO ---")
                 print(f"Para: {user.email}")
                 print(f"Asunto: Recuperación de contraseña STREAK")
@@ -68,7 +68,7 @@ class RecuperarPasswordView(views.APIView):
                     status=status.HTTP_200_OK
                 )
             except Usuario.DoesNotExist:
-                # Buena práctica de seguridad: No revelar si el correo existe o no
+                
                 return Response(
                     {"detail": "Si el correo está registrado en nuestro sistema, se enviarán las instrucciones."},
                     status=status.HTTP_200_OK
@@ -88,16 +88,16 @@ class CambiarPasswordView(views.APIView):
             old_password = serializer.validated_data['old_password']
             new_password = serializer.validated_data['new_password']
             
-            # Verificar la contraseña actual (puede ser la temporal)
+            
             if not user.check_password(old_password):
                 return Response(
                     {"old_password": ["La contraseña actual no es correcta."]},
                     status=status.HTTP_400_BAD_REQUEST
                 )
                 
-            # Establecer nueva contraseña
+            
             user.set_password(new_password)
-            user.pass_temporal_flag = False  # Resetear el flag ya que la ha cambiado
+            user.pass_temporal_flag = False  
             user.save()
             
             return Response(
