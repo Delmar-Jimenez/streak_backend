@@ -14,9 +14,16 @@ from .errors import BusinessError
 from .models import Pago, Usuario
 
 
+def stripe_is_configured():
+    mode = 'live' if settings.STRIPE_LIVE_MODE else 'test'
+    return bool(settings.STRIPE_WEBHOOK_SECRET) and settings.STRIPE_SECRET_KEY.startswith(
+        (f'sk_{mode}_', f'rk_{mode}_')
+    )
+
+
 @api_view(['POST'])
 def pro_suscribir(request):
-    if not settings.STRIPE_SECRET_KEY or not settings.STRIPE_WEBHOOK_SECRET:
+    if not stripe_is_configured():
         raise BusinessError('PAGOS_NO_CONFIGURADOS', 'Los pagos no estan disponibles.', 503)
     key = request.headers.get('Idempotency-Key', '')
     if not re.fullmatch(r'[A-Za-z0-9_-]{8,128}', key):
@@ -68,7 +75,7 @@ def pro_suscribir(request):
 @authentication_classes([])
 @permission_classes([AllowAny])
 def stripe_webhook(request):
-    if not settings.STRIPE_WEBHOOK_SECRET:
+    if not stripe_is_configured():
         raise BusinessError('PAGOS_NO_CONFIGURADOS', 'Los pagos no estan disponibles.', 503)
     try:
         event = stripe.Webhook.construct_event(
@@ -76,6 +83,8 @@ def stripe_webhook(request):
         ).to_dict()
     except (ValueError, stripe.SignatureVerificationError):
         raise BusinessError('FIRMA_INVALIDA', 'Firma de webhook invalida.')
+    if event.get('livemode') is not settings.STRIPE_LIVE_MODE:
+        raise BusinessError('MODO_PAGO_INVALIDO', 'El evento no corresponde al entorno de pagos.')
     event_type = event['type']
     if event_type not in ('payment_intent.succeeded', 'payment_intent.payment_failed', 'payment_intent.canceled', 'charge.refunded'):
         return Response({'recibido': True})

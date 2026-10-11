@@ -29,7 +29,7 @@ class PaymentTests(TestCase):
             'amount_received': 500, 'status': 'succeeded',
             'metadata': {'pago_id': str(pago.pk), 'usuario_id': str(self.user.pk)}, **changes,
         }
-        return {'id': 'evt_test', 'object': 'event', 'type': event_type, 'data': {'object': obj}}
+        return {'id': 'evt_test', 'object': 'event', 'livemode': False, 'type': event_type, 'data': {'object': obj}}
 
     def webhook(self, event, valid=True):
         body = json.dumps(event)
@@ -61,6 +61,34 @@ class PaymentTests(TestCase):
     @override_settings(STRIPE_SECRET_KEY='')
     def test_missing_configuration_returns_503(self):
         self.assertEqual(self.client.post('/api/pro/suscribir/', {}, HTTP_IDEMPOTENCY_KEY='test-key-123').status_code, 503)
+
+    @override_settings(STRIPE_SECRET_KEY='sk_live_fake')
+    @patch('quinielas.views_payments.stripe.StripeClient')
+    def test_test_mode_never_uses_a_live_key(self, client):
+        response = self.client.post('/api/pro/suscribir/', {}, HTTP_IDEMPOTENCY_KEY='test-key-123')
+        self.assertEqual(response.status_code, 503)
+        client.assert_not_called()
+        self.assertFalse(Pago.objects.exists())
+
+    def test_live_or_missing_event_mode_cannot_activate_in_test(self):
+        pago = self.order()
+        for mode in (True, None):
+            event = self.event(pago)
+            event['livemode'] = mode
+            response = self.webhook(event)
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(response.data['error']['codigo'], 'MODO_PAGO_INVALIDO')
+        self.user.refresh_from_db()
+        pago.refresh_from_db()
+        self.assertFalse(self.user.es_pro)
+        self.assertEqual(pago.estado, 'PENDIENTE')
+
+    @override_settings(STRIPE_SECRET_KEY='sk_live_fake', STRIPE_LIVE_MODE=True)
+    def test_live_mode_rejects_test_events(self):
+        pago = self.order()
+        self.assertEqual(self.webhook(self.event(pago)).status_code, 400)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.es_pro)
 
     def test_signed_success_and_duplicate_delivery(self):
         pago = self.order()

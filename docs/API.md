@@ -83,6 +83,13 @@ un orden estable. Validar ese desempate cuando se reciban las reglas completas.
 No se genera ni imprime una contrasena temporal. Se envia un enlace de uso unico
 valido por una hora; la contrasena permanece intacta hasta confirmar el token.
 La app recibe uid/token del enlace y los envia a auth/restablecer/.
+Resend entrega el correo por HTTPS. Mientras falte clave, remitente o enlace de
+la app, auth/recuperar/ devuelve 503 `CORREO_NO_CONFIGURADO` para cualquier correo.
+La URL definitiva esta pendiente del equipo Flutter; `streak://reset-password`
+es solo un ejemplo, no un enlace habilitado. La pantalla debe leer los parametros
+de consulta `uid` y `token`, pedir `new_password` y enviarlos a auth/restablecer/.
+No registrar el enlace, el token ni la nueva contrasena en logs o analitica.
+Mostrar errores de enlace invalido/expirado y volver al login tras el cambio.
 Cambiar o restablecer la contrasena invalida JWT access y refresh anteriores.
 Access dura 15 minutos y refresh 7 dias.
 Login/registro/refresh/cambio tienen limite de 10/min por IP y recuperacion 5/h.
@@ -101,6 +108,11 @@ Esta version conserva una compra unica de acceso PRO. No crea una suscripcion
 recurrente, periodo de vigencia ni renovaciones: requieren la especificacion del
 plan y configuracion de productos/precios en Stripe.
 No se acepta token_pago ni se usa tok_visa por defecto.
+Stripe queda en modo prueba (`STRIPE_LIVE_MODE=False`): usar una clave publicable
+de prueba en Flutter. Una clave secreta real en el backend deja el inicio del pago
+no disponible (503); un webhook de otro entorno se rechaza con
+`MODO_PAGO_INVALIDO`. Usar usuarios de prueba, no cuentas de clientes, porque un
+pago de prueba aprobado tambien cambia el acceso PRO del usuario correspondiente.
 
 Eventos: payment_intent.succeeded, payment_intent.payment_failed,
 payment_intent.canceled, charge.refunded. La firma, usuario, referencia, moneda y

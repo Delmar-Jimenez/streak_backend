@@ -8,6 +8,8 @@ if os.getenv('TEST_DATABASE_URL'):
     DATABASES = {'default': dj_database_url.parse(os.environ['TEST_DATABASE_URL'], conn_max_age=0)}
 SECURE_SSL_REDIRECT = False
 EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+DEFAULT_FROM_EMAIL = 'soporte@example.test'
+STRIPE_LIVE_MODE = False
 PASSWORD_RESET_URL = 'https://app.example.test/reset'
 PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 REST_FRAMEWORK = {**REST_FRAMEWORK, 'DEFAULT_THROTTLE_RATES': {

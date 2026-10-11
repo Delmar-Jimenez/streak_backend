@@ -2,6 +2,7 @@ from urllib.parse import urlencode
 from smtplib import SMTPException
 import logging
 
+from anymail.exceptions import AnymailError
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -58,7 +59,11 @@ class RecuperarPasswordView(views.APIView):
     def post(self, request):
         serializer = RecuperarPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if not settings.PASSWORD_RESET_URL:
+        resend_without_key = (
+            settings.EMAIL_BACKEND == 'anymail.backends.resend.EmailBackend'
+            and not settings.ANYMAIL.get('RESEND_API_KEY')
+        )
+        if not settings.PASSWORD_RESET_URL or not settings.DEFAULT_FROM_EMAIL or resend_without_key:
             raise BusinessError('CORREO_NO_CONFIGURADO', 'La recuperacion no esta disponible.', 503)
         # The response never reveals whether the address belongs to an account.
         for user in Usuario.objects.filter(email__iexact=serializer.validated_data['email'], is_active=True):
@@ -76,7 +81,7 @@ class RecuperarPasswordView(views.APIView):
                     f'Para cambiar tu contrasena abre este enlace (valido por una hora): {link}',
                     settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False,
                 )
-            except (SMTPException, OSError):
+            except (SMTPException, OSError, AnymailError):
                 # Do not expose mailbox existence or log reset credentials on mail failure.
                 logging.getLogger(__name__).warning('No se pudo entregar un correo de recuperacion.')
         return Response({'detail': 'Si el correo esta registrado, recibiras instrucciones para recuperar el acceso.'})

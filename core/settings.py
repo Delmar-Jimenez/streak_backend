@@ -35,7 +35,7 @@ if not DEBUG and not TESTING:
 INSTALLED_APPS = [
     'django.contrib.admin', 'django.contrib.auth', 'django.contrib.contenttypes',
     'django.contrib.sessions', 'django.contrib.messages', 'django.contrib.staticfiles',
-    'corsheaders', 'rest_framework', 'rest_framework_simplejwt', 'quinielas.apps.QuinielasConfig',
+    'anymail', 'corsheaders', 'rest_framework', 'rest_framework_simplejwt', 'quinielas.apps.QuinielasConfig',
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -96,19 +96,24 @@ SECURE_HSTS_PRELOAD = env_bool('SECURE_HSTS_PRELOAD')
 if env_bool('TRUST_PROXY_HTTPS'):
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'anymail.backends.resend.EmailBackend')
+ANYMAIL = {
+    'RESEND_API_KEY': os.getenv('RESEND_API_KEY', ''),
+    'REQUESTS_TIMEOUT': 10,
+}
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', True)
 EMAIL_TIMEOUT = 10
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'no-reply@localhost')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', '')
 PASSWORD_RESET_TIMEOUT = 3600
 PASSWORD_RESET_URL = os.getenv('PASSWORD_RESET_URL', '')
 
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
+STRIPE_LIVE_MODE = env_bool('STRIPE_LIVE_MODE', False)
 STRIPE_PRO_AMOUNT = int(os.getenv('STRIPE_PRO_AMOUNT', '500'))
 STRIPE_CURRENCY = os.getenv('STRIPE_CURRENCY', 'usd').lower()
 
