@@ -46,6 +46,7 @@ class QuinielaAdmin(admin.ModelAdmin):
 
 @admin.register(Participante)
 class ParticipanteAdmin(admin.ModelAdmin):
+    readonly_fields = ('puntos_totales',)
     list_display = ('usuario', 'quiniela', 'puntos_totales', 'fecha_union')
     list_filter = ('quiniela',)
     search_fields = ('usuario__username', 'quiniela__nombre')
@@ -53,6 +54,10 @@ class ParticipanteAdmin(admin.ModelAdmin):
 
 @admin.register(Pronostico)
 class PronosticoAdmin(admin.ModelAdmin):
+    readonly_fields = ('puntos_obtenidos',)
+
+    def get_readonly_fields(self, request, obj=None):
+        return self.readonly_fields + (('participante', 'partido') if obj else ())
     list_display = ('participante', 'partido', 'goles_local_pred', 'goles_visita_pred', 'puntos_obtenidos')
     list_filter = ('participante__quiniela', 'partido__torneo')
     search_fields = ('participante__usuario__username', 'partido__equipo_local__nombre', 'partido__equipo_visita__nombre')

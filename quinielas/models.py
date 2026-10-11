@@ -1,4 +1,6 @@
-from django.db import models
+from django.db import models, transaction
+from django.core.exceptions import ValidationError
+from django.db.models.functions import Lower
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 
@@ -7,6 +9,11 @@ class Usuario(AbstractUser):
     foto = models.ImageField(upload_to='perfiles/', blank=True, null=True)
     es_pro = models.BooleanField(default=False)
     pass_temporal_flag = models.BooleanField(default=False)
+
+    class Meta(AbstractUser.Meta):
+        constraints = [
+            models.UniqueConstraint(Lower('email'), condition=~models.Q(email=''), name='usuario_email_ci_unico'),
+        ]
 
     def __str__(self):
         return self.username
@@ -67,6 +74,26 @@ class Partido(models.Model):
     goles_visita = models.IntegerField(null=True, blank=True)
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.PROGRAMADO)
 
+    def clean(self):
+        errors = {}
+        if self.equipo_local_id == self.equipo_visita_id:
+            errors['equipo_visita'] = 'Los equipos deben ser diferentes.'
+        for field in ('equipo_local', 'equipo_visita', 'fase'):
+            if getattr(self, f'{field}_id') and getattr(self, field).torneo_id != self.torneo_id:
+                errors[field] = 'Debe pertenecer al mismo torneo.'
+        for field in ('goles_local', 'goles_visita'):
+            value = getattr(self, field)
+            if value is not None and value < 0:
+                errors[field] = 'Los goles no pueden ser negativos.'
+            if self.estado == self.Estado.FINALIZADO and value is None:
+                errors[field] = 'Un partido finalizado requiere marcador.'
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            return super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.equipo_local} vs {self.equipo_visita} ({self.fecha_hora.strftime('%Y-%m-%d %H:%M')})"
 
@@ -99,6 +126,18 @@ class Pronostico(models.Model):
     goles_visita_pred = models.IntegerField()
     puntos_obtenidos = models.IntegerField(default=0)
 
+    def clean(self):
+        if self.participante_id and self.partido_id:
+            if self.participante.quiniela.torneo_id != self.partido.torneo_id:
+                raise ValidationError('El partido debe pertenecer al torneo de la quiniela.')
+        if any(value is not None and value < 0 for value in (self.goles_local_pred, self.goles_visita_pred)):
+            raise ValidationError('Los goles no pueden ser negativos.')
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            Participante.objects.select_for_update().get(pk=self.participante_id)
+            return super().save(*args, **kwargs)
+
     class Meta:
         unique_together = ('participante', 'partido')
 
@@ -110,13 +149,21 @@ class Pago(models.Model):
         PENDIENTE = 'PENDIENTE', _('Pendiente')
         COMPLETADO = 'COMPLETADO', _('Completado')
         FALLIDO = 'FALLIDO', _('Fallido')
+        CANCELADO = 'CANCELADO', _('Cancelado')
         REEMBOLSADO = 'REEMBOLSADO', _('Reembolsado')
 
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='pagos')
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.PENDIENTE)
     referencia = models.CharField(max_length=255)
+    moneda = models.CharField(max_length=3, default='usd')
+    clave_idempotencia = models.CharField(max_length=128, null=True, blank=True)
     fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['usuario', 'clave_idempotencia'], name='pago_usuario_idempotencia'),
+        ]
 
     def __str__(self):
         return f"Pago {self.id} - {self.usuario.username} - {self.monto}"
