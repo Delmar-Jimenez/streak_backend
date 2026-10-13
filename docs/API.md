@@ -75,7 +75,9 @@ Se admiten marcadores enteros no negativos, de partidos del torneo de la quiniel
 El torneo debe estar ACTIVO y el partido PROGRAMADO.
 La escritura se cierra exactamente cinco minutos antes de fecha_hora, aunque el administrador no
 haya cambiado el estado. Cada participante tiene un pronostico por partido.
-El partido publica cierre_pronosticos y pronosticos_abiertos. Las fases admiten
+El partido publica cierre_pronosticos y pronosticos_abiertos. Un partido cierra
+al llegar a fecha_hora menos cinco minutos, o al cambiar a EN_JUEGO, lo que ocurra
+primero. FINALIZADO, SUSPENDIDO y CANCELADO no aceptan nuevos pronosticos. Las fases admiten
 LIGA, GRUPOS y ELIMINATORIA. goles_local/goles_visita son siempre el marcador
 reglamentario que se puntua; goles_local_prorroga/goles_visita_prorroga y
 penales_local/penales_visita son informativos y no se suman a esos campos.
@@ -158,8 +160,12 @@ partidos_cerrados, penalizacion_puntos y advertencia. No crea participantes.
 Si hay partidos cerrados, mostrar la advertencia y solicitar aceptacion antes de
 POST unirse/ con aceptar_ingreso_tardio:true. Omitirla devuelve 409
 CONFIRMACION_INGRESO_TARDIO con la consulta actualizada en error.detalles.
-La formula de penalizacion no fue definida por negocio: penalizacion_puntos es
-null y NO se descuentan puntos. No confundir falta de definicion con una regla de cero.
+Al ingresar, cada usuario solo puede pronosticar partidos que sigan abiertos.
+Los cerrados anteriores a su ingreso no crean pronosticos y por tanto aportan 0;
+no se descuenta puntaje por ingresar tarde. SUSPENDIDO y CANCELADO quedan fuera
+de `partidos_cerrados`, porque ya valen 0 para todos. `penalizacion_puntos` es
+siempre 0. El total del nuevo participante inicia en 0 y suma normalmente con
+sus pronosticos posteriores, usando la escala 5/4/3/0 y el desempate habitual.
 
 ## Eliminacion de cuenta
 

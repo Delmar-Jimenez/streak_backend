@@ -191,7 +191,7 @@ def validar_ingreso(quiniela, user):
         'quiniela_id': quiniela.pk, 'nombre': quiniela.nombre, 'torneo_nombre': quiniela.torneo.nombre,
         'cantidad_inscritos': quiniela.participantes.count(), 'max_participantes': quiniela.max_participantes,
         'ingreso_tardio': cerrados > 0, 'requiere_confirmacion': cerrados > 0,
-        'partidos_cerrados': cerrados, 'penalizacion_puntos': None,
+        'partidos_cerrados': cerrados, 'penalizacion_puntos': 0,
         'advertencia': 'No podras pronosticar partidos cuyo plazo ya cerro.' if cerrados else '',
     }
 

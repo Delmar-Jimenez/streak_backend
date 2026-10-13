@@ -37,13 +37,72 @@ class MobileAuditTests(TestCase):
         preview = self.client.post('/api/quinielas/validar-codigo/', data).json()
         self.assertTrue(preview['ingreso_tardio'])
         self.assertEqual(preview['partidos_cerrados'], 1)
-        self.assertIsNone(preview['penalizacion_puntos'])
+        self.assertEqual(preview['penalizacion_puntos'], 0)
         self.assertFalse(self.outsider.participaciones.exists())
         self.assertEqual(self.client.post('/api/quinielas/unirse/', data).status_code, 409)
         self.assertFalse(self.outsider.participaciones.exists())
         response = self.client.post('/api/quinielas/unirse/', {**data, 'aceptar_ingreso_tardio': True}, format='json')
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data['puntos_totales'], 0)
+
+    def test_late_join_only_scores_open_matches_and_excludes_suspended_games(self):
+        now = timezone.now()
+        self.partido.fecha_hora = now - timedelta(hours=2)
+        self.partido.estado = 'FINALIZADO'
+        self.partido.goles_local = 2
+        self.partido.goles_visita = 1
+        self.partido.save()
+        en_juego = type(self.partido).objects.create(
+            torneo=self.torneo, fase=self.fase, equipo_local=self.local, equipo_visita=self.visita,
+            fecha_hora=now + timedelta(hours=1), estado='EN_JUEGO',
+        )
+        suspendido = type(self.partido).objects.create(
+            torneo=self.torneo, fase=self.fase, equipo_local=self.visita, equipo_visita=self.local,
+            fecha_hora=now - timedelta(hours=1), estado='SUSPENDIDO',
+        )
+        cancelado = type(self.partido).objects.create(
+            torneo=self.torneo, fase=self.fase, equipo_local=self.local, equipo_visita=self.visita,
+            fecha_hora=now - timedelta(hours=1), estado='CANCELADO',
+        )
+        self.client.force_authenticate(self.outsider)
+        data = {'codigo': self.quiniela.codigo_unico}
+        preview = self.client.post('/api/quinielas/validar-codigo/', data).json()
+        self.assertEqual(preview['partidos_cerrados'], 2)
+        self.assertEqual(preview['penalizacion_puntos'], 0)
+        joined = self.client.post('/api/quinielas/unirse/', {
+            **data, 'aceptar_ingreso_tardio': True,
+        }, format='json')
+        self.assertEqual(joined.status_code, 201, joined.data)
+        participant = Participante.objects.get(pk=joined.data['id'])
+
+        for closed_match in (self.partido, en_juego, suspendido, cancelado):
+            response = self.client.post(
+                f'/api/quinielas/{self.quiniela.pk}/pronosticos/',
+                {'partido': closed_match.pk, 'goles_local_pred': 2, 'goles_visita_pred': 1},
+                format='json',
+            )
+            self.assertEqual(response.status_code, 400)
+        self.assertFalse(participant.pronosticos.exists())
+        participant.refresh_from_db()
+        self.assertEqual(participant.puntos_totales, 0)
+
+        proximo = type(self.partido).objects.create(
+            torneo=self.torneo, fase=self.fase, equipo_local=self.local, equipo_visita=self.visita,
+            fecha_hora=now + timedelta(hours=3), estado='PROGRAMADO',
+        )
+        response = self.client.post(
+            f'/api/quinielas/{self.quiniela.pk}/pronosticos/',
+            {'partido': proximo.pk, 'goles_local_pred': 2, 'goles_visita_pred': 1},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        proximo.goles_local = 2
+        proximo.goles_visita = 1
+        proximo.estado = 'FINALIZADO'
+        proximo.save()
+        participant.refresh_from_db()
+        self.assertEqual(participant.puntos_totales, 5)
+        self.assertEqual(participant.pronosticos.count(), 1)
 
     def test_exact_five_minute_deadline(self):
         now = timezone.now()

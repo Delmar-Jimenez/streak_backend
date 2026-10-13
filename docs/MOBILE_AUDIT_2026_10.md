@@ -23,8 +23,12 @@ los limites, la confirmacion de ingreso tardio y el permiso para consultar perfi
 
 ## Decisiones pendientes
 
-- No existe formula aprobada de penalizacion por ingreso tardio. Se informa null;
-  no hay descuentos inventados. Se requiere definirla antes de certificar esa RN.
+- Ingreso tardio (RN-31, RN-37, RN-38): antes de confirmar, consultar
+  /quinielas/validar-codigo/. Los juegos cerrados anteriores a la union no admiten
+  pronostico y aportan 0 a esa persona. El cierre ocurre cinco minutos antes o al
+  pasar a EN_JUEGO, lo primero que ocurra. Suspendidos/cancelados valen 0 para
+  todos y no se cuentan como oportunidades perdidas. No se descuenta puntaje por
+  unirse tarde; el total inicia en 0 y suma con las predicciones disponibles.
 - Resend sin dominio propio solo envia desde onboarding@resend.dev al correo de
   la cuenta Resend. Un mensaje Hello World entregado no comprueba recuperacion.
 - La integracion de pagos sigue en modo prueba y conserva compra unica PRO.
