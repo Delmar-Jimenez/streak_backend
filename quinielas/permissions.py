@@ -1,4 +1,5 @@
 from rest_framework.permissions import BasePermission
+from .errors import BusinessError
 
 class IsPasswordNotTemporal(BasePermission):
     """
@@ -11,5 +12,6 @@ class IsPasswordNotTemporal(BasePermission):
     def has_permission(self, request, view):
         
         if request.user and request.user.is_authenticated:
-            return not getattr(request.user, 'pass_temporal_flag', False)
+            if getattr(request.user, 'pass_temporal_flag', False):
+                raise BusinessError('PASSWORD_TEMPORAL', self.message, 403)
         return True

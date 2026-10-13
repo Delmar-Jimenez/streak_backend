@@ -6,12 +6,14 @@ import stripe
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .errors import BusinessError
 from .models import Pago, Usuario
+from .serializers import PagoSerializer
 
 
 def stripe_is_configured():
@@ -19,6 +21,93 @@ def stripe_is_configured():
     return bool(settings.STRIPE_WEBHOOK_SECRET) and settings.STRIPE_SECRET_KEY.startswith(
         (f'sk_{mode}_', f'rk_{mode}_')
     )
+
+
+def recuperar_intent(pago, client):
+    if pago.referencia:
+        intent = client.v1.payment_intents.retrieve(pago.referencia)
+    elif pago.fecha >= timezone.now() - timedelta(hours=23):
+        # The same server-side key recovers a response lost during creation.
+        intent = client.v1.payment_intents.create({
+            'amount': int(pago.monto * 100), 'currency': pago.moneda,
+            'automatic_payment_methods': {'enabled': True},
+            'metadata': {'pago_id': str(pago.pk), 'usuario_id': str(pago.usuario_id)},
+            'description': 'Acceso PRO STREAK',
+        }, options={'idempotency_key': f'streak-pro-{pago.pk}'})
+    else:
+        found = client.v1.payment_intents.search({'query':
+            f'metadata["pago_id"]:"{pago.pk}" AND metadata["usuario_id"]:"{pago.usuario_id}"', 'limit': 2})
+        if len(found.data) != 1 or found.has_more:
+            raise BusinessError('PAGO_REQUIERE_REVISION', 'No se pudo conciliar el pago pendiente. No se creara otro cobro.', 409)
+        intent = found.data[0]
+    if (intent.metadata.get('pago_id') != str(pago.pk)
+        or intent.metadata.get('usuario_id') != str(pago.usuario_id)
+        or intent.amount != int(pago.monto * 100) or intent.currency != pago.moneda
+        or intent.livemode is not settings.STRIPE_LIVE_MODE):
+        raise BusinessError('PAGO_INCONSISTENTE', 'Los datos del pago no coinciden.', 409)
+    with transaction.atomic():
+        user = Usuario.objects.select_for_update().get(pk=pago.usuario_id)
+        locked = Pago.objects.select_for_update().get(pk=pago.pk)
+        if locked.referencia and locked.referencia != intent.id:
+            raise BusinessError('PAGO_INCONSISTENTE', 'La referencia del pago no coincide.', 409)
+        locked.referencia = intent.id
+        if intent.status == 'succeeded' and locked.estado != Pago.Estado.REEMBOLSADO:
+            if intent.amount_received != int(pago.monto * 100):
+                raise BusinessError('PAGO_INCONSISTENTE', 'El importe liquidado no coincide.', 409)
+            locked.estado = Pago.Estado.COMPLETADO
+        elif intent.status == 'canceled' and locked.estado not in (Pago.Estado.COMPLETADO, Pago.Estado.REEMBOLSADO):
+            locked.estado = Pago.Estado.CANCELADO
+        locked.save(update_fields=['referencia', 'estado'])
+        if locked.estado == Pago.Estado.COMPLETADO:
+            user.es_pro = True
+            user.save(update_fields=['es_pro'])
+    pago.refresh_from_db()
+    return intent
+
+
+@api_view(['GET'])
+def pro_pago_pendiente(request):
+    pago = request.user.pagos.filter(estado__in=[Pago.Estado.PENDIENTE, Pago.Estado.FALLIDO]).order_by('id').first()
+    response = Response({'pago': None})
+    if pago:
+        if not stripe_is_configured():
+            raise BusinessError('PAGOS_NO_CONFIGURADOS', 'Los pagos no estan disponibles.', 503)
+        try:
+            intent = recuperar_intent(pago, stripe.StripeClient(settings.STRIPE_SECRET_KEY))
+        except stripe.StripeError:
+            raise BusinessError('PROVEEDOR_PAGO_NO_DISPONIBLE', 'No se pudo recuperar el pago. Intenta nuevamente.', 502)
+        response = Response({'pago': PagoSerializer(pago).data, 'clave_idempotencia': pago.clave_idempotencia,
+            'estado': intent.status, 'client_secret': intent.client_secret if pago.estado in (Pago.Estado.PENDIENTE, Pago.Estado.FALLIDO) else None})
+    response['Cache-Control'] = 'no-store'
+    return response
+
+
+@api_view(['POST'])
+def pro_cancelar_pago(request, pk):
+    pago = get_object_or_404(Pago, pk=pk, usuario=request.user)
+    if pago.estado == Pago.Estado.CANCELADO:
+        return Response(PagoSerializer(pago).data)
+    if pago.estado in (Pago.Estado.COMPLETADO, Pago.Estado.REEMBOLSADO):
+        raise BusinessError('PAGO_NO_CANCELABLE', 'Un pago liquidado no puede cancelarse.', 409)
+    if not stripe_is_configured():
+        raise BusinessError('PAGOS_NO_CONFIGURADOS', 'Los pagos no estan disponibles.', 503)
+    try:
+        client = stripe.StripeClient(settings.STRIPE_SECRET_KEY)
+        intent = recuperar_intent(pago, client)
+        if intent.status == 'succeeded':
+            raise BusinessError('PAGO_NO_CANCELABLE', 'El pago ya fue liquidado.', 409)
+        if intent.status != 'canceled':
+            try:
+                client.v1.payment_intents.cancel(intent.id, {}, options={'idempotency_key': f'streak-cancel-{pago.pk}'})
+            except stripe.InvalidRequestError:
+                # A webhook or another device may have settled/canceled it meanwhile.
+                pass
+            intent = recuperar_intent(pago, client)
+        if intent.status != 'canceled':
+            raise BusinessError('PAGO_NO_CANCELABLE', 'Stripe no permite cancelar el pago en su estado actual.', 409)
+    except stripe.StripeError:
+        raise BusinessError('PROVEEDOR_PAGO_NO_DISPONIBLE', 'No se pudo cancelar el pago. Intenta nuevamente.', 502)
+    return Response(PagoSerializer(pago).data)
 
 
 @api_view(['POST'])
@@ -95,10 +184,12 @@ def stripe_webhook(request):
         return Response({'recibido': True})
     with transaction.atomic():
         order = Pago.objects.filter(pk=pago_id).first()
-        if order is None:
+        if order is None or order.usuario_id is None:
             return Response({'recibido': True})
         # All orders for one account share a lock so refunds cannot race with activation.
-        user = Usuario.objects.select_for_update().get(pk=order.usuario_id)
+        user = Usuario.objects.select_for_update().filter(pk=order.usuario_id).first()
+        if user is None:
+            return Response({'recibido': True})
         pago = Pago.objects.select_for_update().get(pk=order.pk)
         reference = obj.get('payment_intent') if event_type == 'charge.refunded' else obj['id']
         if (

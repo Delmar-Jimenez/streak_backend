@@ -125,8 +125,12 @@ class ApiTests(TestCase):
     def test_temporary_password_blocks_protected_endpoints(self):
         self.user.pass_temporal_flag = True
         self.user.save()
-        for url in ('/api/usuarios/me/', '/api/quinielas/mias/', '/api/pro/estado/', '/api/pro/pagos/'):
-            self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.client.get('/api/usuarios/me/').status_code, 200)
+        self.assertTrue(self.client.get('/api/usuarios/me/').data['pass_temporal_flag'])
+        for url in ('/api/quinielas/mias/', '/api/pro/estado/', '/api/pro/pagos/'):
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertEqual(response.data['error']['codigo'], 'PASSWORD_TEMPORAL')
         self.assertEqual(self.pronosticar().status_code, 403)
         response = self.client.post('/api/auth/cambiar-password/', {'old_password': 'Strong-password-94!', 'new_password': 'Another-Strong-772!'})
         self.assertEqual(response.status_code, 200, response.data)
@@ -233,7 +237,7 @@ class ApiTests(TestCase):
         self.assertEqual(self.user.password, original)
         self.assertEqual(len(mail.outbox), 1)
         link = mail.outbox[0].body.split()[-1]
-        query = parse_qs(urlparse(link).query)
+        query = parse_qs(urlparse(link).fragment)
         payload = {'uid': query['uid'][0], 'token': query['token'][0], 'new_password': 'Different-password-99!'}
         response = self.client.post('/api/auth/restablecer/', payload)
         self.assertEqual(response.status_code, 200, response.data)

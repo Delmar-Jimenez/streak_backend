@@ -12,6 +12,7 @@ DEFAULT_FROM_EMAIL = 'soporte@example.test'
 STRIPE_LIVE_MODE = False
 PASSWORD_RESET_URL = 'https://app.example.test/reset'
 PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
+STORAGES = {**STORAGES, 'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'}}
 REST_FRAMEWORK = {**REST_FRAMEWORK, 'DEFAULT_THROTTLE_RATES': {
     'auth': '10000/min', 'password_reset': '10000/hour',
 }}

@@ -29,6 +29,7 @@ en esa infraestructura, fuera de Django.
 | POST | auth/restablecer/ | uid, token, new_password del enlace; 200. |
 | POST | auth/cambiar-password/ | old_password, new_password; 200, iniciar sesion nuevamente. |
 | GET, PUT, PATCH | usuarios/me/ | Perfil. PUT/PATCH permiten first_name, last_name, telefono, foto. |
+| DELETE | usuarios/me/ | password actual y confirmar: true. Eliminacion permanente; 204. |
 | GET | torneos/ | Torneos activos/finalizados. |
 | GET | torneos/{id}/ | Detalle del torneo. |
 | GET | torneos/{id}/equipos/ | Equipos y escudos. |
@@ -38,7 +39,8 @@ en esa infraestructura, fuera de Django.
 | POST | quinielas/ | nombre, torneo, max_participantes; 201. Creador inscrito automaticamente. |
 | GET | quinielas/mias/ | Quinielas creadas o en las que participa el usuario. |
 | GET | quinielas/historial/ | Quinielas propias cuyo torneo esta FINALIZADO. |
-| POST | quinielas/unirse/ | codigo; acepta tambien codigo_unico por compatibilidad. 201. |
+| POST | quinielas/validar-codigo/ | codigo; consulta previa sin inscribir. |
+| POST | quinielas/unirse/ | codigo; acepta tambien codigo_unico. aceptar_ingreso_tardio: true cuando lo requiere la consulta previa. 201. |
 | GET | quinielas/{id}/ | Detalle accesible a miembros. |
 | GET | quinielas/{id}/participantes/ | Miembros con id de participante, usuario, username, puntos y fecha_union. |
 | GET | quinielas/{id}/tabla/ | Participantes por puntos descendentes y campo posicion. |
@@ -47,9 +49,11 @@ en esa infraestructura, fuera de Django.
 | GET | quinielas/{id}/participantes/{uid}/detalle/ | uid es ID de usuario; devuelve participante y partidos con pronostico/puntos_obtenidos. |
 | GET, POST | quinielas/{id}/pronosticos/ | GET propios. POST partido, goles_local_pred, goles_visita_pred; 201 nuevo o 200 actualizado. |
 | GET | quinielas/{id}/participantes/{participante_id}/pronosticos/ | Pronosticos del participante de la misma quiniela. |
-| GET | pro/estado/ | es_pro. |
+| GET | pro/estado/ | es_pro y plan: monto_centavos, moneda, tipo, modo_prueba, max_participantes y max_participantes_gratis. |
 | POST | pro/suscribir/ | Header Idempotency-Key; devuelve pago_id, referencia, client_secret y estado Stripe. |
 | GET | pro/pagos/ | Historial propio: id, monto, moneda, estado, referencia, fecha. |
+| GET | pro/pago-pendiente/ | pago, clave_idempotencia, estado Stripe y client_secret; pago:null si no existe. |
+| POST | pro/pagos/{id}/cancelar/ | Cancela una orden propia no liquidada cuando Stripe lo permite. |
 | POST | pro/webhook/ | Cuerpo original de Stripe y Stripe-Signature; uso exclusivo del proveedor. |
 
 El perfil no permite modificar privilegios ni correo; cambiar correo requiere un
@@ -57,15 +61,24 @@ flujo de verificacion que no forma parte del informe recibido. Fotos se envian
 como multipart/form-data. No se publican emails ni telefonos de otros miembros.
 Los detalles incluyen todos los participantes/partidos aunque no tengan pronostico.
 Un pronostico ausente u oculto se representa con null y puntos_obtenidos=0.
+`estado_pronostico` distingue VISIBLE, NO_REGISTRADO y OCULTO. Antes del inicio,
+todos los rivales son OCULTO, sin revelar si ya pronosticaron.
+Participantes y tablas incluyen foto y es_pro. Los partidos incluyen
+equipo_local_detalle/equipo_visita_detalle con nombre y escudo, manteniendo los IDs.
+`mias` e `historial` incluyen torneo_nombre, cantidad_inscritos, mis_puntos y mi_posicion.
 Las tres consultas de partidos/detalle requieren pertenecer a la quiniela.
 `mias` conserva todas las propias; `historial` es el subconjunto finalizado.
 
 ## Pronosticos y puntuacion
 
 Se admiten marcadores enteros no negativos, de partidos del torneo de la quiniela.
-El torneo debe estar ACTIVO y el partido PROGRAMADO con fecha_hora futura.
-La escritura se cierra al llegar la hora de inicio, aunque el administrador no
+El torneo debe estar ACTIVO y el partido PROGRAMADO.
+La escritura se cierra exactamente cinco minutos antes de fecha_hora, aunque el administrador no
 haya cambiado el estado. Cada participante tiene un pronostico por partido.
+El partido publica cierre_pronosticos y pronosticos_abiertos. Las fases admiten
+LIGA, GRUPOS y ELIMINATORIA. goles_local/goles_visita son siempre el marcador
+reglamentario que se puntua; goles_local_prorroga/goles_visita_prorroga y
+penales_local/penales_visita son informativos y no se suman a esos campos.
 
 Pronosticos propios son visibles siempre. Los rivales solo son visibles para
 miembros de la misma quiniela desde fecha_hora del partido. Esta interpretacion
@@ -83,11 +96,16 @@ un orden estable. Validar ese desempate cuando se reciban las reglas completas.
 No se genera ni imprime una contrasena temporal. Se envia un enlace de uso unico
 valido por una hora; la contrasena permanece intacta hasta confirmar el token.
 La app recibe uid/token del enlace y los envia a auth/restablecer/.
-Resend entrega el correo por HTTPS. Mientras falte clave, remitente o enlace de
-la app, auth/recuperar/ devuelve 503 `CORREO_NO_CONFIGURADO` para cualquier correo.
-La URL definitiva esta pendiente del equipo Flutter; `streak://reset-password`
-es solo un ejemplo, no un enlace habilitado. La pantalla debe leer los parametros
-de consulta `uid` y `token`, pedir `new_password` y enviarlos a auth/restablecer/.
+Resend entrega el correo por HTTPS. Mientras falte clave o remitente,
+auth/recuperar/ devuelve 503 `CORREO_NO_CONFIGURADO` para cualquier correo.
+El correo incluye HTML y un enlace HTTPS a /recuperar-acceso/ en este backend.
+La pagina permite solicitar el correo y cambiar la contrasena sin instalar la app.
+uid y token viajan en el fragmento (#), no en la consulta HTTP, para evitar logs.
+PASSWORD_RESET_URL permite sustituir esta pagina por otra HTTPS con el mismo contrato.
+PASSWORD_RESET_APP_URL agrega un boton opcional a un deep link streak:// ya implementado.
+GET usuarios/me/ funciona con contrasena temporal y expone pass_temporal_flag.
+Las operaciones restringidas devuelven 403 PASSWORD_TEMPORAL. El usuario puede
+cambiar su clave o eliminar su propia cuenta sin desbloquear el resto de la API.
 No registrar el enlace, el token ni la nueva contrasena en logs o analitica.
 Mostrar errores de enlace invalido/expirado y volver al login tras el cambio.
 Cambiar o restablecer la contrasena invalida JWT access y refresh anteriores.
@@ -102,6 +120,11 @@ un cache compartido y limitacion adicional en el proxy.
 2. POST pro/suscribir/ con esa cabecera. Reintentar fallos de red con la misma clave.
 3. Confirmar el client_secret mediante el SDK Stripe de la app. No registrarlo en logs.
 4. Consultar pro/estado/ tras completar el SDK; el webhook firmado activa PRO.
+5. Si el dispositivo pierde su clave, consultar pro/pago-pendiente/. Se recupera
+   la orden existente y su secreto sin crear un segundo cobro; nunca guardar ese
+   secreto en logs. La consulta puede conciliar el estado desde Stripe.
+6. Para abandonar una orden pendiente, POST pro/pagos/{id}/cancelar/. Si ya se
+   liquido devuelve 409 PAGO_NO_CANCELABLE, no ejecuta un reembolso.
 
 Monto inicial conservado: USD 5.00, configurable desde el servidor.
 Esta version conserva una compra unica de acceso PRO. No crea una suscripcion
@@ -122,8 +145,35 @@ pago completo; uno parcial lo conserva. Confirmar esta politica con negocio.
 Una orden pendiente o con un fallo de pago recuperable impide crear otra con
 distinta clave (409); se reintenta la misma orden hasta completarla o cancelarla
 en Stripe. Cancelaciones confirmadas se registran como CANCELADO.
-Una orden sin referencia mayor
-a 23 horas requiere conciliacion en Stripe antes de reintentarse.
+Una orden sin referencia mayor a 23 horas se busca por sus metadatos en Stripe;
+si no hay exactamente una coincidencia, devuelve PAGO_REQUIERE_REVISION sin recrearla.
+
+## Ingreso y limites
+
+max_participantes debe ser 2..50 para creadores gratuitos o 2..100 para PRO.
+Los nuevos codigos no contienen 0, 1, I, L ni O; codigos existentes siguen validos.
+POST quinielas/validar-codigo/ devuelve quiniela_id, nombre, torneo_nombre,
+cantidad_inscritos, max_participantes, ingreso_tardio, requiere_confirmacion,
+partidos_cerrados, penalizacion_puntos y advertencia. No crea participantes.
+Si hay partidos cerrados, mostrar la advertencia y solicitar aceptacion antes de
+POST unirse/ con aceptar_ingreso_tardio:true. Omitirla devuelve 409
+CONFIRMACION_INGRESO_TARDIO con la consulta actualizada en error.detalles.
+La formula de penalizacion no fue definida por negocio: penalizacion_puntos es
+null y NO se descuentan puntos. No confundir falta de definicion con una regla de cero.
+
+## Eliminacion de cuenta
+
+URL publica para la ficha de la app: https://streak-api-6cl2.onrender.com/eliminar-cuenta/.
+La web verifica usuario, contrasena actual y confirmacion; protege el formulario con CSRF.
+La app debe ofrecer una opcion visible y llamar DELETE usuarios/me/ con JWT y
+{"password":"...","confirmar":true}. No hay borrado de otras cuentas por ID.
+Se eliminan perfil, foto almacenada, participaciones y pronosticos; JWT dejan de
+funcionar. Quinielas compartidas permanecen con creador:null. Pagos conservan
+importe, fecha, estado y referencia de Stripe, sin usuario ni clave de idempotencia.
+Eliminar la cuenta no reembolsa ni cancela por si solo un pago en procesamiento.
+El equipo debe definir y publicar plazos de retencion de registros financieros y
+respaldos, y gestionar los datos del proveedor de pagos conforme a esa politica.
+Esta implementacion no sustituye la integracion Flutter ni la revision de Google Play.
 
 Referencias: [PaymentIntents](https://docs.stripe.com/api/payment_intents),
 [SDK Python](https://github.com/stripe/stripe-python),

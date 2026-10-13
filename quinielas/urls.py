@@ -40,10 +40,13 @@ routes = [
     ('quinielas/<int:pk>/tabla/', views_api.quiniela_tabla, 'quiniela_tabla'),
     ('quinielas/<int:pk>/participantes/<int:participante_id>/pronosticos/', views_api.quiniela_rival_pronosticos, 'quiniela_rival_pronosticos'),
     ('quinielas/unirse/', views_api.quiniela_unirse, 'quiniela_unirse'),
+    ('quinielas/validar-codigo/', views_api.quiniela_validar_codigo, 'quiniela_validar_codigo'),
     ('quinielas/<int:pk>/pronosticos/', views_api.quiniela_pronosticos, 'quiniela_pronosticos'),
     ('pro/estado/', views_api.pro_estado, 'pro_estado'),
     ('pro/suscribir/', views_payments.pro_suscribir, 'pro_suscribir'),
     ('pro/pagos/', views_api.pro_pagos, 'pro_pagos'),
+    ('pro/pago-pendiente/', views_payments.pro_pago_pendiente, 'pro_pago_pendiente'),
+    ('pro/pagos/<int:pk>/cancelar/', views_payments.pro_cancelar_pago, 'pro_cancelar_pago'),
     ('pro/webhook/', views_payments.stripe_webhook, 'stripe_webhook'),
 ]
 

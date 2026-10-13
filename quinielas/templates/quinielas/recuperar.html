@@ -1,0 +1,12 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>STREAK | Recuperar acceso</title><link rel="stylesheet" href="{% static 'quinielas/cuenta.css' %}"><script src="{% static 'quinielas/recuperar.js' %}" defer></script></head>
+<body><header><a href="/recuperar-acceso/">STREAK</a><span>Cuenta</span></header>
+<main data-app-url="{{ app_url }}"><p class="eyebrow">Acceso a tu cuenta</p><h1>Restablecer contrasena</h1>
+<p id="estado" role="status" aria-live="polite"></p>
+<form id="solicitar" method="post">{% csrf_token %}<label for="email">Correo electronico</label><input id="email" name="email" type="email" autocomplete="email" required maxlength="254"><button type="submit">Enviar enlace</button></form>
+<form id="restablecer" hidden method="post">{% csrf_token %}<label for="password">Nueva contrasena</label><input id="password" type="password" autocomplete="new-password" minlength="8" required><label for="confirmacion">Repetir contrasena</label><input id="confirmacion" type="password" autocomplete="new-password" minlength="8" required><button type="submit">Guardar contrasena</button></form>
+<a id="abrir-app" hidden class="secondary" href="#">Abrir en STREAK</a>
+<noscript>Activa JavaScript para restablecer tu contrasena.</noscript>
+</main><footer><a href="/eliminar-cuenta/">Eliminar mi cuenta</a><span>STREAK</span></footer></body></html>

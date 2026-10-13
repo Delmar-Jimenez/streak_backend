@@ -18,19 +18,55 @@ class EquipoSerializer(serializers.ModelSerializer):
 
 
 class FaseSerializer(serializers.ModelSerializer):
+    solo_tiempo_reglamentario = serializers.SerializerMethodField()
+
+    def get_solo_tiempo_reglamentario(self, obj):
+        return True
     class Meta:
         model = Fase
         fields = '__all__'
 
 
 class PartidoSerializer(serializers.ModelSerializer):
+    equipo_local_detalle = EquipoSerializer(source='equipo_local', read_only=True)
+    equipo_visita_detalle = EquipoSerializer(source='equipo_visita', read_only=True)
+    fase_tipo = serializers.CharField(source='fase.tipo', read_only=True)
+    cierre_pronosticos = serializers.DateTimeField(read_only=True)
+    pronosticos_abiertos = serializers.BooleanField(read_only=True)
     class Meta:
         model = Partido
         fields = '__all__'
 
 
 class QuinielaSerializer(serializers.ModelSerializer):
-    max_participantes = serializers.IntegerField(min_value=1)
+    max_participantes = serializers.IntegerField(min_value=2, max_value=100)
+    torneo_nombre = serializers.CharField(source='torneo.nombre', read_only=True)
+    cantidad_inscritos = serializers.SerializerMethodField()
+    mis_puntos = serializers.SerializerMethodField()
+    mi_posicion = serializers.SerializerMethodField()
+
+    def get_cantidad_inscritos(self, obj):
+        return len(obj.participantes.all())
+
+    def _miembro(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return None
+        return next((p for p in obj.participantes.all() if p.usuario_id == request.user.pk), None)
+
+    def get_mis_puntos(self, obj):
+        miembro = self._miembro(obj)
+        return miembro.puntos_totales if miembro else None
+
+    def get_mi_posicion(self, obj):
+        miembro = self._miembro(obj)
+        return 1 + sum(p.puntos_totales > miembro.puntos_totales for p in obj.participantes.all()) if miembro else None
+
+    def validate_max_participantes(self, value):
+        limite = 100 if self.context['request'].user.es_pro else 50
+        if value > limite:
+            raise serializers.ValidationError(f'El limite de tu plan es de {limite} participantes.')
+        return value
 
     class Meta:
         model = Quiniela
@@ -44,7 +80,7 @@ class QuinielaSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         for attempt in range(10):
-            codigo = ''.join(secrets.choice('ABCDEFGHJKMNPQRSTUVWXYZ123456789') for _ in range(6))
+            codigo = ''.join(secrets.choice('ABCDEFGHJKMNPQRSTUVWXYZ23456789') for _ in range(6))
             try:
                 with transaction.atomic():
                     return Quiniela.objects.create(codigo_unico=codigo, **validated_data)
@@ -66,10 +102,12 @@ class PronosticoSerializer(serializers.ModelSerializer):
 
 class ParticipanteSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='usuario.username', read_only=True)
+    foto = serializers.ImageField(source='usuario.foto', read_only=True)
+    es_pro = serializers.BooleanField(source='usuario.es_pro', read_only=True)
 
     class Meta:
         model = Participante
-        fields = ('id', 'usuario', 'username', 'puntos_totales', 'fecha_union')
+        fields = ('id', 'usuario', 'username', 'foto', 'es_pro', 'puntos_totales', 'fecha_union')
 
 
 class PagoSerializer(serializers.ModelSerializer):
@@ -81,6 +119,7 @@ class PagoSerializer(serializers.ModelSerializer):
 class UnirseSerializer(serializers.Serializer):
     codigo = serializers.CharField(min_length=6, max_length=6, required=False)
     codigo_unico = serializers.CharField(min_length=6, max_length=6, required=False)
+    aceptar_ingreso_tardio = serializers.BooleanField(default=False)
 
     def validate(self, attrs):
         codigo = attrs.get('codigo', '').upper()
@@ -89,4 +128,4 @@ class UnirseSerializer(serializers.Serializer):
             raise serializers.ValidationError({'codigo': 'Este campo es requerido.'})
         if codigo and legacy and codigo != legacy:
             raise serializers.ValidationError('codigo y codigo_unico deben coincidir.')
-        return {'codigo_unico': codigo or legacy}
+        return {'codigo_unico': codigo or legacy, 'aceptar_ingreso_tardio': attrs['aceptar_ingreso_tardio']}

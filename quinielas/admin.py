@@ -1,5 +1,9 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.urls import path
+from django.shortcuts import render
+from django.core.exceptions import PermissionDenied
+from .demo import cargar_demo
 from .models import (
     Usuario, Torneo, Equipo, Fase, Partido,
     Quiniela, Participante, Pronostico, Pago
@@ -17,6 +21,17 @@ class TorneoAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'formato', 'temporada', 'estado')
     list_filter = ('estado', 'formato', 'temporada')
     search_fields = ('nombre', 'temporada')
+
+    def get_urls(self):
+        return [path('demo/', self.admin_site.admin_view(self.demo), name='quinielas_torneo_demo')] + super().get_urls()
+
+    def demo(self, request):
+        if not request.user.is_superuser:
+            raise PermissionDenied
+        context = {**self.admin_site.each_context(request), 'title': 'Datos de demostracion STREAK'}
+        if request.method == 'POST' and request.POST.get('confirmar') == 'si':
+            context['resultado'] = cargar_demo()
+        return render(request, 'admin/quinielas/demo.html', context)
 
 @admin.register(Equipo)
 class EquipoAdmin(admin.ModelAdmin):

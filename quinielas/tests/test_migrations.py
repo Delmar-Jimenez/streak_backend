@@ -24,8 +24,8 @@ class LegacyMigrationTests(TransactionTestCase):
             owner = User.objects.create(username='owner')
             rival = User.objects.create(username='rival')
             torneo = Torneo.objects.create(nombre='Legacy', temporada='2026')
-            fase = Fase.objects.create(torneo=torneo, nombre='Fase', orden=1, tipo='LIGA')
-            local = Equipo.objects.create(torneo=torneo, nombre='A')
+            fase = Fase.objects.create(torneo=torneo, nombre='Fase', orden=1, tipo='1')
+            local = Equipo.objects.create(torneo=torneo, nombre='A', escudo='escudos/marquense.png')
             visita = Equipo.objects.create(torneo=torneo, nombre='B')
             partido = Partido.objects.create(torneo=torneo, fase=fase, equipo_local=local, equipo_visita=visita,
                 fecha_hora=timezone.now(), estado='FINALIZADO', goles_local=2, goles_visita=1)
@@ -36,6 +36,8 @@ class LegacyMigrationTests(TransactionTestCase):
             executor = MigrationExecutor(connection)
             executor.migrate(latest)
             new_apps = executor.loader.project_state(latest).apps
+            self.assertEqual(new_apps.get_model('quinielas', 'Fase').objects.get(pk=fase.pk).tipo, 'LIGA')
+            self.assertTrue(new_apps.get_model('quinielas', 'ImagenArchivo').objects.filter(pk='escudos/marquense.png').exists())
             self.assertEqual(new_apps.get_model('quinielas', 'Participante').objects.get(pk=member.pk).puntos_totales, 5)
             self.assertEqual(new_apps.get_model('quinielas', 'Pronostico').objects.get(pk=pred.pk).puntos_obtenidos, 5)
             self.assertTrue(new_apps.get_model('quinielas', 'Participante').objects.filter(quiniela_id=quiniela.pk, usuario_id=owner.pk).exists())

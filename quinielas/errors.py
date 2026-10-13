@@ -2,7 +2,6 @@ from django.http import JsonResponse
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError
 from rest_framework.exceptions import APIException
-from rest_framework.views import exception_handler as drf_exception_handler
 
 
 class BusinessError(APIException):
@@ -12,6 +11,7 @@ class BusinessError(APIException):
 
 
 def exception_handler(exc, context):
+    from rest_framework.views import exception_handler as drf_exception_handler
     if isinstance(exc, DjangoValidationError):
         exc = ValidationError(exc.message_dict if hasattr(exc, 'message_dict') else exc.messages)
     response = drf_exception_handler(exc, context)

@@ -1,0 +1,6 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+{% if resultado %}<p>Datos DEMO preparados: {{ resultado }}</p><p>Las cuentas nuevas no tienen contrasena de acceso. Asigna sus claves desde Usuarios antes de entregar la demo.</p>{% endif %}
+<p>Se crean tres torneos DEMO (dos activos y uno terminado), ocho equipos por torneo con escudos, fases, partidos y cuatro usuarios. DEMO Ana tiene PRO. Repetir no duplica registros ni cambia contrasenas.</p>
+<form method="post">{% csrf_token %}<label><input type="checkbox" name="confirmar" value="si" required> Confirmo la creacion de datos identificados como DEMO.</label><p><input type="submit" value="Preparar demostracion"></p></form>
+{% endblock %}

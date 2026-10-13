@@ -48,17 +48,18 @@ class ResendTests(TestCase):
         self.assertEqual(payload['to'], [self.user.email])
         self.assertEqual(payload['from'], 'STREAK <soporte@example.test>')
         link = payload['text'].split()[-1]
-        self.assertTrue(link.startswith('streak://reset-password?'))
+        self.assertTrue(link.startswith('https://testserver/recuperar-acceso/#'))
+        self.assertIn('href=', payload['html'])
         self.user.refresh_from_db()
         self.assertEqual(self.user.password, original)
-        query = parse_qs(urlsplit(link).query)
+        query = parse_qs(urlsplit(link).fragment)
         reset = {'uid': query['uid'][0], 'token': query['token'][0], 'new_password': 'New-password-897!'}
         self.assertEqual(self.client.post('/api/auth/restablecer', reset).status_code, 200)
         self.assertEqual(self.client.post('/api/auth/restablecer', reset).status_code, 400)
 
     @patch('requests.sessions.Session.request')
     def test_missing_configuration_is_unavailable_for_every_address(self, request):
-        for setting in ({'PASSWORD_RESET_URL': ''}, {'DEFAULT_FROM_EMAIL': ''},
+        for setting in ({'DEFAULT_FROM_EMAIL': ''},
                         {'ANYMAIL': {'RESEND_API_KEY': ''}}):
             with self.subTest(setting=setting), override_settings(**setting):
                 known = self.recover()

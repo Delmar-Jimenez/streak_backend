@@ -81,7 +81,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = Path(os.getenv('MEDIA_ROOT', str(BASE_DIR / 'media')))
 STORAGES = {
-    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'default': {'BACKEND': 'quinielas.storage.DatabaseImageStorage'},
     'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
 }
 CORS_ALLOWED_ORIGINS = env_list('CORS_ALLOWED_ORIGINS')
@@ -110,6 +110,8 @@ EMAIL_TIMEOUT = 10
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', '')
 PASSWORD_RESET_TIMEOUT = 3600
 PASSWORD_RESET_URL = os.getenv('PASSWORD_RESET_URL', '')
+PASSWORD_RESET_APP_URL = os.getenv('PASSWORD_RESET_APP_URL', '')
+DATA_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
 
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')

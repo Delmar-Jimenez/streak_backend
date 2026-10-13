@@ -3,12 +3,15 @@ from django.core.exceptions import ValidationError
 from django.db.models.functions import Lower
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
+from datetime import timedelta
+from django.utils import timezone
 
 class Usuario(AbstractUser):
     telefono = models.CharField(max_length=20, blank=True, null=True)
     foto = models.ImageField(upload_to='perfiles/', blank=True, null=True)
     es_pro = models.BooleanField(default=False)
     pass_temporal_flag = models.BooleanField(default=False)
+    es_demo = models.BooleanField(default=False, editable=False)
 
     class Meta(AbstractUser.Meta):
         constraints = [
@@ -32,6 +35,7 @@ class Torneo(models.Model):
     formato = models.CharField(max_length=50, choices=Formato.choices, default=Formato.LIGA)
     temporada = models.CharField(max_length=50)
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.BORRADOR)
+    demo_clave = models.CharField(max_length=50, unique=True, null=True, blank=True, editable=False)
 
     def __str__(self):
         return f"{self.nombre} - {self.temporada}"
@@ -46,13 +50,24 @@ class Equipo(models.Model):
         return self.nombre
 
 class Fase(models.Model):
+    class Tipo(models.TextChoices):
+        LIGA = 'LIGA', _('Liga')
+        GRUPOS = 'GRUPOS', _('Grupos')
+        ELIMINATORIA = 'ELIMINATORIA', _('Eliminatoria')
+
     torneo = models.ForeignKey(Torneo, on_delete=models.CASCADE, related_name='fases')
     nombre = models.CharField(max_length=100)
     orden = models.IntegerField()
-    tipo = models.CharField(max_length=50)
+    tipo = models.CharField(max_length=50, choices=Tipo.choices)
+
+    def save(self, *args, **kwargs):
+        if self.tipo not in self.Tipo.values:
+            raise ValidationError({'tipo': 'Selecciona LIGA, GRUPOS o ELIMINATORIA.'})
+        return super().save(*args, **kwargs)
 
     class Meta:
         ordering = ['orden']
+        constraints = [models.CheckConstraint(condition=models.Q(tipo__in=['LIGA', 'GRUPOS', 'ELIMINATORIA']), name='fase_tipo_valido')]
 
     def __str__(self):
         return f"{self.torneo.nombre} - {self.nombre}"
@@ -72,7 +87,20 @@ class Partido(models.Model):
     fecha_hora = models.DateTimeField()
     goles_local = models.IntegerField(null=True, blank=True)
     goles_visita = models.IntegerField(null=True, blank=True)
+    # The scoring fields above always represent regulation time, not extra time/penalties.
+    goles_local_prorroga = models.PositiveSmallIntegerField(null=True, blank=True)
+    goles_visita_prorroga = models.PositiveSmallIntegerField(null=True, blank=True)
+    penales_local = models.PositiveSmallIntegerField(null=True, blank=True)
+    penales_visita = models.PositiveSmallIntegerField(null=True, blank=True)
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.PROGRAMADO)
+
+    @property
+    def cierre_pronosticos(self):
+        return self.fecha_hora - timedelta(minutes=5)
+
+    @property
+    def pronosticos_abiertos(self):
+        return self.estado == self.Estado.PROGRAMADO and timezone.now() < self.cierre_pronosticos
 
     def clean(self):
         errors = {}
@@ -100,9 +128,14 @@ class Partido(models.Model):
 class Quiniela(models.Model):
     nombre = models.CharField(max_length=255)
     torneo = models.ForeignKey(Torneo, on_delete=models.CASCADE, related_name='quinielas')
-    creador = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='quinielas_creadas')
+    creador = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, related_name='quinielas_creadas')
     codigo_unico = models.CharField(max_length=6, unique=True)
     max_participantes = models.IntegerField()
+
+    def clean(self):
+        limite = 100 if self.creador_id and self.creador.es_pro else 50
+        if self.max_participantes is not None and not 2 <= self.max_participantes <= limite:
+            raise ValidationError({'max_participantes': f'El limite permitido es de 2 a {limite}.'})
 
     def __str__(self):
         return self.nombre
@@ -152,7 +185,7 @@ class Pago(models.Model):
         CANCELADO = 'CANCELADO', _('Cancelado')
         REEMBOLSADO = 'REEMBOLSADO', _('Reembolsado')
 
-    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='pagos')
+    usuario = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, related_name='pagos')
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.PENDIENTE)
     referencia = models.CharField(max_length=255)
@@ -166,4 +199,11 @@ class Pago(models.Model):
         ]
 
     def __str__(self):
-        return f"Pago {self.id} - {self.usuario.username} - {self.monto}"
+        return f"Pago {self.id} - {self.usuario_id or 'cuenta eliminada'} - {self.monto}"
+
+
+class ImagenArchivo(models.Model):
+    nombre = models.CharField(max_length=255, primary_key=True)
+    contenido = models.BinaryField()
+    tipo = models.CharField(max_length=50, default='image/webp')
+    creado = models.DateTimeField(auto_now_add=True)

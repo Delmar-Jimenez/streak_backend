@@ -1,0 +1,14 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>STREAK | Eliminar cuenta</title><link rel="stylesheet" href="{% static 'quinielas/cuenta.css' %}"></head>
+<body><header><a href="/recuperar-acceso/">STREAK</a><span>Cuenta</span></header><main>
+{% if eliminada %}<p class="eyebrow">Solicitud completada</p><h1>Cuenta eliminada</h1><p>Tu cuenta y perfil ya fueron eliminados. Tus sesiones anteriores dejaron de ser validas.</p>
+{% else %}<p class="eyebrow">Privacidad y datos</p><h1>Eliminar mi cuenta</h1>
+<p>La eliminacion es permanente e inmediata. Se borran tu perfil, correo, telefono, foto, pronosticos y participaciones. Las quinielas compartidas permanecen para sus otros integrantes, sin asociarlas a tu cuenta.</p>
+<p>Los registros de transacciones permanecen separados de tu perfil para conciliacion. Stripe conserva sus propios registros conforme a su politica. Eliminar la cuenta no solicita un reembolso ni cancela un pago que ya este procesandose.</p>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<form method="post">{% csrf_token %}<label for="username">Nombre de usuario</label><input id="username" name="username" autocomplete="username" maxlength="150" required><label for="password">Contrasena actual</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+<label class="check"><input type="checkbox" name="confirmar" value="si" required><span>Confirmo que deseo eliminar permanentemente mi cuenta STREAK.</span></label><button class="danger" type="submit">Eliminar mi cuenta</button></form>
+<a class="secondary" href="/recuperar-acceso/">Olvide mi contrasena</a>{% endif %}</main>
+<footer><span>STREAK</span><a href="https://stripe.com/privacy">Privacidad de Stripe</a></footer></body></html>

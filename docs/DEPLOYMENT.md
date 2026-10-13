@@ -53,14 +53,16 @@ ejecutar `python manage.py recalcular_puntos` al terminar.
   sirvan exclusivamente HTTPS. check --deploy puede avisar si no se activan.
 - Correo: Resend por HTTPS mediante Anymail (ver la seccion siguiente). No usar
   SMTP 25/465/587 en Render Free, que bloquea esos puertos. No activar recuperacion
-  hasta verificar el remitente y tener una pantalla que procese uid y token.
+  hasta verificar el remitente y probar la pagina HTTPS de recuperacion incluida.
 - Stripe: claves del mismo entorno y endpoint HTTPS /api/pro/webhook/ con los cuatro
   eventos documentados. Copiar su secreto de firma a STRIPE_WEBHOOK_SECRET.
   Primero validar el flujo completo con Stripe en modo prueba y la app.
-- Media: MEDIA_ROOT debe estar en almacenamiento persistente y publicarse por el
-  servidor/CDN. WhiteNoise sirve estaticos, no las fotos de usuarios. Si hay archivos
-  antiguos en escudos/ o perfiles/, conservarlos y trasladarlos al volumen configurado
-  manteniendo las rutas guardadas en la base.
+- Media: fotos y escudos pequenos se normalizan a WebP y se guardan en
+  ImagenArchivo de la misma Supabase. /media/ los sirve con DEBUG=False.
+  Limites: 5 MB de entrada, 16 megapixeles y 1024px por lado tras normalizar.
+  Esto evita perder archivos al reiniciar Render Free; vigilar la cuota de Supabase.
+  La migracion 0008 importa archivos antiguos disponibles en MEDIA_ROOT o el
+  repositorio sin cambiar sus nombres. Archivos ya perdidos requieren volver a cargarse.
 - Limites: usar cache compartido/proxy para limitar solicitudes entre replicas.
 
 ## Resend y recuperacion de contrasena
@@ -74,8 +76,7 @@ Durante el desarrollo sin dominio propio se puede usar
 dominio al correo de su propia cuenta (puede ser Gmail), no a una lista arbitraria
 de destinatarios. No usar Gmail como remitente de Resend ni redirigir tokens de
 otros usuarios al buzon de pruebas. El modo sandbox de SendGrid no entrega mensajes.
-La recuperacion sigue deshabilitada hasta tener un enlace funcional de Flutter;
-se puede comprobar entrega con un correo de prueba sin tokens por separado.
+El backend incluye una pagina HTTPS propia de recuperacion; ya no depende de Flutter.
 
 1. Confirmar un dominio propio y el acceso a su DNS. `soporte@streak.com` fue solo
    un ejemplo: no usarlo sin confirmar propiedad. Agregar el dominio a Resend y
@@ -85,11 +86,11 @@ se puede comprobar entrega con un correo de prueba sin tokens por separado.
    directamente como `RESEND_API_KEY` en Render. No subirla a Git ni al chat.
 3. Configurar `DEFAULT_FROM_EMAIL` con el remitente verificado y, opcionalmente,
    `EMAIL_BACKEND=anymail.backends.resend.EmailBackend` para dejarlo explicito.
-4. Dejar `PASSWORD_RESET_URL` vacio hasta que Flutter implemente y pruebe el enlace.
-   La API devuelve 503 `CORREO_NO_CONFIGURADO` sin enviar correos mientras falte
-   enlace, remitente o clave. No usar un enlace de ejemplo como valor publicado.
-5. Cuando este lista la pantalla, configurar su URL y probar con una cuenta de
-   prueba propia: recepcion, apertura del enlace, cambio y rechazo del token usado.
+4. Dejar `PASSWORD_RESET_URL` vacio para usar /recuperar-acceso/ de este backend.
+   La API devuelve 503 CORREO_NO_CONFIGURADO si falta remitente o clave.
+   Si se configura otra pagina HTTPS, debe leer uid/token del fragmento (#).
+5. Probar con una cuenta propia: recepcion, apertura del enlace, cambio y rechazo
+   del token usado. PASSWORD_RESET_APP_URL es opcional cuando Flutter tenga su deep link.
 
 Las excepciones del proveedor no se exponen ni se imprimen con sus detalles,
 para no filtrar correos, claves o tokens. Un rechazo o timeout conserva la respuesta
@@ -128,9 +129,26 @@ completar personalmente su ingreso y guardado. No compartir las nuevas claves.
 ## Verificacion posterior
 
 Confirmar que /crear-admin/ devuelve 404; login/perfil funcionan por HTTPS;
-un pronostico anterior al inicio se guarda y uno posterior se rechaza;
+un pronostico anterior al cierre de cinco minutos se guarda y uno posterior se rechaza;
 finalizar/corregir un partido actualiza la tabla; el correo llega sin aparecer en
 logs; y Stripe activa PRO solo tras webhook firmado, incluso con reenvios.
+
+## Migracion movil y demostracion
+
+0006 agrega imagenes, marcadores de prorroga/penales y conserva grupos/pagos cuando
+se elimina su creador. 0007 normaliza tipos de fase; los valores numericos antiguos
+solo se convierten a LIGA si el torneo ya es LIGA. Valores desconocidos detienen
+la migracion para revision, sin inventar un tipo. 0008 importa imagenes disponibles.
+Estas migraciones no cambian DATABASE_URL ni el proveedor de base de datos.
+
+Con autorizacion del titular y respaldo previo, ejecutar `python manage.py cargar_demo`
+o abrir /admin/quinielas/torneo/demo/ como superusuario y confirmar. Es repetible,
+no sobrescribe datos existentes. Crea tres torneos DEMO (dos activos, uno finalizado),
+ocho equipos con escudos por torneo, fases, 24 partidos y cuatro usuarios marcados DEMO.
+Los usuarios demo_streak_ana, demo_streak_bruno, demo_streak_carla y demo_streak_diego
+no reciben contrasenas predeterminadas. El titular debe asignarlas personalmente
+desde el administrador para iniciar sesion en la app; Ana tiene PRO de demostracion.
+Sus quinielas usan DMALFA, DMBETA y DMGAMA. No se hacen cobros ni se envian correos.
 
 ## Render y GitHub
 

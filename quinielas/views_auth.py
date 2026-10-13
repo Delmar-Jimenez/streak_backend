@@ -1,4 +1,6 @@
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit, urlunsplit
+from django.urls import reverse
+from django.utils.html import format_html
 from smtplib import SMTPException
 import logging
 
@@ -18,6 +20,8 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .errors import BusinessError
+from .permissions import IsPasswordNotTemporal
+from .accounts import eliminar_cuenta
 from .serializers_auth import (
     RegisterSerializer, RecuperarPasswordSerializer, CambiarPasswordSerializer,
     RestablecerPasswordSerializer, PerfilSerializer,
@@ -43,9 +47,25 @@ class CustomTokenRefreshView(TokenRefreshView):
     serializer_class = SecureTokenRefreshSerializer
 
 
-class PerfilView(generics.RetrieveUpdateAPIView):
+class PerfilView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = PerfilSerializer
-    http_method_names = ['get', 'put', 'patch', 'head', 'options']
+    http_method_names = ['get', 'put', 'patch', 'delete', 'head', 'options']
+    throttle_scope = 'auth'
+
+    def get_permissions(self):
+        permissions = [IsAuthenticated()]
+        if self.request.method not in ('GET', 'HEAD', 'OPTIONS', 'DELETE'):
+            permissions.append(IsPasswordNotTemporal())
+        return permissions
+
+    def destroy(self, request, *args, **kwargs):
+        if request.data.get('confirmar') is not True:
+            raise BusinessError('CONFIRMACION_REQUERIDA', 'Confirma la eliminacion permanente de tu cuenta.')
+        password = request.data.get('password')
+        if not isinstance(password, str) or not password:
+            raise BusinessError('PASSWORD_REQUERIDO', 'Ingresa tu contrasena actual.')
+        eliminar_cuenta(request.user, password)
+        return Response(status=204)
 
     def get_object(self):
         return self.request.user
@@ -63,7 +83,7 @@ class RecuperarPasswordView(views.APIView):
             settings.EMAIL_BACKEND == 'anymail.backends.resend.EmailBackend'
             and not settings.ANYMAIL.get('RESEND_API_KEY')
         )
-        if not settings.PASSWORD_RESET_URL or not settings.DEFAULT_FROM_EMAIL or resend_without_key:
+        if not settings.DEFAULT_FROM_EMAIL or resend_without_key:
             raise BusinessError('CORREO_NO_CONFIGURADO', 'La recuperacion no esta disponible.', 503)
         # The response never reveals whether the address belongs to an account.
         for user in Usuario.objects.filter(email__iexact=serializer.validated_data['email'], is_active=True):
@@ -73,13 +93,19 @@ class RecuperarPasswordView(views.APIView):
                 'uid': urlsafe_base64_encode(force_bytes(user.pk)),
                 'token': default_token_generator.make_token(user),
             })
-            separator = '&' if '?' in settings.PASSWORD_RESET_URL else '?'
-            link = settings.PASSWORD_RESET_URL + separator + query
+            base = settings.PASSWORD_RESET_URL or request.build_absolute_uri(reverse('recuperar_acceso'))
+            # Tokens in the fragment never reach HTTP access logs or Referer headers.
+            # Older custom schemes are routed through the HTTPS page as well.
+            if urlsplit(base).scheme != 'https':
+                base = request.build_absolute_uri(reverse('recuperar_acceso'))
+            parts = urlsplit(base)
+            link = urlunsplit(('https', parts.netloc, parts.path, '', query))
             try:
                 send_mail(
                     'Recuperacion de acceso STREAK',
                     f'Para cambiar tu contrasena abre este enlace (valido por una hora): {link}',
                     settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False,
+                    html_message=format_html('<p>Recuperacion de acceso STREAK</p><p><a href="{}">Restablecer contrasena</a></p><p>El enlace vence en una hora.</p>', link),
                 )
             except (SMTPException, OSError, AnymailError):
                 # Do not expose mailbox existence or log reset credentials on mail failure.
