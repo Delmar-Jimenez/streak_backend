@@ -45,6 +45,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'quinielas.middleware.ZonaHorariaAdminMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -73,6 +74,8 @@ PASSWORD_HASHERS = [
 ]
 LANGUAGE_CODE = 'es'
 TIME_ZONE = 'UTC'
+# Zona horaria del panel /admin/ (la API y la base de datos siguen en UTC).
+ADMIN_TIME_ZONE = os.getenv('ADMIN_TIME_ZONE', 'America/Guatemala')
 USE_I18N = True
 USE_TZ = True
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

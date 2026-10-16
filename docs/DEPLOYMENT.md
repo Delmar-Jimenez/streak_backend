@@ -49,6 +49,8 @@ ejecutar `python manage.py recalcular_puntos` al terminar.
 - CORS_ALLOWED_ORIGINS: origenes web completos autorizados; no usar asteriscos.
   Flutter nativo no depende de CORS, pero Flutter Web si.
 - CSRF_TRUSTED_ORIGINS: origen HTTPS del administrador.
+- ADMIN_TIME_ZONE: zona horaria del panel /admin/ (por defecto America/Guatemala). Las fechas se
+  capturan y muestran en esa hora; la base de datos y la API siguen en UTC.
 - HSTS para subdominios/preload: activar solo cuando todos los dominios correspondientes
   sirvan exclusivamente HTTPS. check --deploy puede avisar si no se activan.
 - Correo: Resend por HTTPS mediante Anymail (ver la seccion siguiente). No usar
