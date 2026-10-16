@@ -22,13 +22,13 @@ en esa infraestructura, fuera de Django.
 
 | Metodo | Ruta | Entrada / resultado |
 | --- | --- | --- |
-| POST | auth/register/ | username, email, password; telefono, first_name, last_name opcionales. 201, sin password. |
+| POST | auth/register/ | username, email, password; telefono, first_name, last_name y fecha_nacimiento (ISO `YYYY-MM-DD`, opcional, no futura, edad <= 120 anios) opcionales. 201, sin password. |
 | POST | auth/login/ | username, password; devuelve access y refresh. |
 | POST | auth/login/refresh/ | refresh; devuelve access. |
 | POST | auth/recuperar/ | email; respuesta generica 200 y enlace por correo si existe. |
 | POST | auth/restablecer/ | uid, token, new_password del enlace; 200. |
 | POST | auth/cambiar-password/ | old_password, new_password; 200, iniciar sesion nuevamente. |
-| GET, PUT, PATCH | usuarios/me/ | Perfil. PUT/PATCH permiten first_name, last_name, telefono, foto. |
+| GET, PUT, PATCH | usuarios/me/ | Perfil; expone fecha_nacimiento (`YYYY-MM-DD` o null). PUT/PATCH permiten first_name, last_name, telefono, fecha_nacimiento (misma validacion que el registro; null la borra), foto. |
 | DELETE | usuarios/me/ | password actual y confirmar: true. Eliminacion permanente; 204. |
 | GET | torneos/ | Torneos activos/finalizados. |
 | GET | torneos/{id}/ | Detalle del torneo. |
@@ -40,7 +40,7 @@ en esa infraestructura, fuera de Django.
 | GET | quinielas/mias/ | Quinielas creadas o en las que participa el usuario. |
 | GET | quinielas/historial/ | Quinielas propias cuyo torneo esta FINALIZADO. |
 | POST | quinielas/validar-codigo/ | codigo; consulta previa sin inscribir. |
-| POST | quinielas/unirse/ | codigo; acepta tambien codigo_unico. aceptar_ingreso_tardio: true cuando lo requiere la consulta previa. 201. |
+| POST | quinielas/unirse/ | codigo; acepta tambien codigo_unico. aceptar_ingreso_tardio: true cuando lo requiere la consulta previa. 201: datos del participante (id, usuario, ...) mas `quiniela_id` y `quiniela` (mismo objeto que GET quinielas/{id}/). |
 | GET | quinielas/{id}/ | Detalle accesible a miembros. |
 | GET | quinielas/{id}/participantes/ | Miembros con id de participante, usuario, username, puntos y fecha_union. |
 | GET | quinielas/{id}/tabla/ | Participantes por puntos descendentes y campo posicion. |
