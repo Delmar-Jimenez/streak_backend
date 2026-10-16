@@ -217,7 +217,10 @@ def quiniela_unirse(request):
         return Response({'error': {'codigo': 'CONFIRMACION_INGRESO_TARDIO',
             'mensaje': preview['advertencia'], 'detalles': preview}}, status=409)
     participante = Participante.objects.create(quiniela=quiniela, usuario=request.user)
-    return Response(ParticipanteSerializer(participante, context={'request': request}).data, status=201)
+    data = ParticipanteSerializer(participante, context={'request': request}).data
+    data['quiniela_id'] = quiniela.pk
+    data['quiniela'] = QuinielaSerializer(quiniela, context={'request': request}).data
+    return Response(data, status=201)
 
 
 @api_view(['GET'])

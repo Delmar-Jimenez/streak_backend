@@ -12,6 +12,7 @@ class Usuario(AbstractUser):
     es_pro = models.BooleanField(default=False)
     pass_temporal_flag = models.BooleanField(default=False)
     es_demo = models.BooleanField(default=False, editable=False)
+    fecha_nacimiento = models.DateField(null=True, blank=True)
 
     class Meta(AbstractUser.Meta):
         constraints = [
