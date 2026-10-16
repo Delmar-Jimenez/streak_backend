@@ -3,6 +3,7 @@ from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import stripe
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
@@ -223,9 +224,12 @@ class PendingPaymentTests(TestCase):
     order = test_payments.PaymentTests.order
 
     def intent(self, pago, status='requires_payment_method'):
-        return SimpleNamespace(id='pi_test', client_secret='pi_test_secret_fake', status=status, amount=500,
-            amount_received=500 if status == 'succeeded' else 0, currency='usd', livemode=False,
-            metadata={'pago_id': str(pago.pk), 'usuario_id': str(self.user.pk)})
+        return stripe.PaymentIntent.construct_from({
+            'id': 'pi_test', 'client_secret': 'pi_test_secret_fake', 'status': status,
+            'amount': 500, 'amount_received': 500 if status == 'succeeded' else 0,
+            'currency': 'usd', 'livemode': False,
+            'metadata': {'pago_id': str(pago.pk), 'usuario_id': str(self.user.pk)},
+        }, 'sk_test_fake')
 
     @patch('quinielas.views_payments.stripe.StripeClient')
     def test_recover_lost_key_without_creating_duplicate(self, factory):

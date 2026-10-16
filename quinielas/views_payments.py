@@ -40,8 +40,9 @@ def recuperar_intent(pago, client):
         if len(found.data) != 1 or found.has_more:
             raise BusinessError('PAGO_REQUIERE_REVISION', 'No se pudo conciliar el pago pendiente. No se creara otro cobro.', 409)
         intent = found.data[0]
-    if (intent.metadata.get('pago_id') != str(pago.pk)
-        or intent.metadata.get('usuario_id') != str(pago.usuario_id)
+    metadata = intent.to_dict().get('metadata', {})
+    if (metadata.get('pago_id') != str(pago.pk)
+        or metadata.get('usuario_id') != str(pago.usuario_id)
         or intent.amount != int(pago.monto * 100) or intent.currency != pago.moneda
         or intent.livemode is not settings.STRIPE_LIVE_MODE):
         raise BusinessError('PAGO_INCONSISTENTE', 'Los datos del pago no coinciden.', 409)
