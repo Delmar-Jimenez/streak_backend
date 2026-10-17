@@ -225,25 +225,55 @@ class ApiTests(TestCase):
         self.assertEqual(response.data['email'], 'new@example.test')
         self.assertNotIn('password', response.data)
 
-    def test_reset_does_not_change_password_until_confirmed(self):
+    def test_recuperar_envia_contrasena_temporal_que_obliga_a_cambiarla(self):
         self.client.force_authenticate(None)
-        original = self.user.password
         with patch('builtins.print') as printed:
             known = self.client.post('/api/auth/recuperar/', {'email': self.user.email})
             unknown = self.client.post('/api/auth/recuperar/', {'email': 'unknown@example.test'})
             printed.assert_not_called()
         self.assertEqual(known.data, unknown.data)
-        self.user.refresh_from_db()
-        self.assertEqual(self.user.password, original)
         self.assertEqual(len(mail.outbox), 1)
-        link = mail.outbox[0].body.split()[-1]
-        query = parse_qs(urlparse(link).fragment)
-        payload = {'uid': query['uid'][0], 'token': query['token'][0], 'new_password': 'Different-password-99!'}
-        response = self.client.post('/api/auth/restablecer/', payload)
-        self.assertEqual(response.status_code, 200, response.data)
+        temporal = mail.outbox[0].body.split('es: ')[1].split()[0]
+        self.assertEqual(len(temporal), 10)
         self.user.refresh_from_db()
-        self.assertTrue(self.user.check_password(payload['new_password']))
-        self.assertEqual(self.client.post('/api/auth/restablecer/', payload).status_code, 400)
+        self.assertTrue(self.user.check_password(temporal))
+        self.assertTrue(self.user.pass_temporal_flag)
+        restante = self.user.pass_temporal_expira - timezone.now()
+        self.assertTrue(timedelta(hours=23, minutes=59) < restante <= timedelta(hours=24))
+        login = self.client.post('/api/auth/login/', {'username': self.user.username, 'password': temporal})
+        self.assertEqual(login.status_code, 200, login.data)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
+        self.assertTrue(self.client.get('/api/usuarios/me/').data['pass_temporal_flag'])
+        bloqueado = self.client.get('/api/quinielas/mias/')
+        self.assertEqual(bloqueado.status_code, 403)
+        self.assertEqual(bloqueado.data['error']['codigo'], 'PASSWORD_TEMPORAL')
+        cambio = self.client.post('/api/auth/cambiar-password/', {'old_password': temporal, 'new_password': 'Different-password-99!'})
+        self.assertEqual(cambio.status_code, 200, cambio.data)
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.pass_temporal_flag)
+        self.assertIsNone(self.user.pass_temporal_expira)
+
+    def test_contrasena_temporal_vencida_no_permite_entrar_ni_cambiarla(self):
+        self.client.force_authenticate(None)
+        self.user.set_password('Temporal-12345')
+        self.user.pass_temporal_flag = True
+        self.user.pass_temporal_expira = timezone.now() - timedelta(minutes=1)
+        self.user.save()
+        login = self.client.post('/api/auth/login/', {'username': self.user.username, 'password': 'Temporal-12345'})
+        self.assertEqual(login.status_code, 400, login.data)
+        self.assertEqual(login.data['error']['codigo'], 'PASSWORD_TEMPORAL_VENCIDA')
+        self.client.force_authenticate(self.user)
+        cambio = self.client.post('/api/auth/cambiar-password/', {'old_password': 'Temporal-12345', 'new_password': 'Different-password-99!'})
+        self.assertEqual(cambio.status_code, 400)
+        self.assertEqual(cambio.data['error']['codigo'], 'PASSWORD_TEMPORAL_VENCIDA')
+
+    def test_temporal_marcada_por_el_admin_sin_vencimiento_sigue_sirviendo(self):
+        self.client.force_authenticate(None)
+        self.user.set_password('Temporal-12345')
+        self.user.pass_temporal_flag = True
+        self.user.save()
+        login = self.client.post('/api/auth/login/', {'username': self.user.username, 'password': 'Temporal-12345'})
+        self.assertEqual(login.status_code, 200, login.data)
 
     def test_reset_rejects_invalid_token_and_weak_password(self):
         self.client.force_authenticate(None)

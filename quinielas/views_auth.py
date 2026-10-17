@@ -1,6 +1,5 @@
-from urllib.parse import urlencode, urlsplit, urlunsplit
-from django.urls import reverse
 from django.utils.html import format_html
+from datetime import timedelta
 from smtplib import SMTPException
 import logging
 
@@ -11,8 +10,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.db import transaction
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils import timezone
+from django.utils.http import urlsafe_base64_decode
 from rest_framework import generics, views
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -21,11 +20,11 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .errors import BusinessError
 from .permissions import IsPasswordNotTemporal
-from .accounts import eliminar_cuenta
+from .accounts import eliminar_cuenta, generar_password_temporal
 from .serializers_auth import (
     RegisterSerializer, RecuperarPasswordSerializer, CambiarPasswordSerializer,
     RestablecerPasswordSerializer, PerfilSerializer,
-    SecureTokenRefreshSerializer,
+    SecureTokenRefreshSerializer, LoginSerializer,
 )
 
 Usuario = get_user_model()
@@ -40,6 +39,7 @@ class RegisterView(generics.CreateAPIView):
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     throttle_scope = 'auth'
+    serializer_class = LoginSerializer
 
 
 class CustomTokenRefreshView(TokenRefreshView):
@@ -85,32 +85,35 @@ class RecuperarPasswordView(views.APIView):
         )
         if not settings.DEFAULT_FROM_EMAIL or resend_without_key:
             raise BusinessError('CORREO_NO_CONFIGURADO', 'La recuperacion no esta disponible.', 503)
-        # The response never reveals whether the address belongs to an account.
+        # RN-06: se genera una contrasena temporal de 10 caracteres, se envia al correo registrado,
+        # se marca pass_temporal_flag y vence a las 24 horas. La respuesta no revela si el correo existe.
         for user in Usuario.objects.filter(email__iexact=serializer.validated_data['email'], is_active=True):
             if not user.has_usable_password():
                 continue
-            query = urlencode({
-                'uid': urlsafe_base64_encode(force_bytes(user.pk)),
-                'token': default_token_generator.make_token(user),
-            })
-            base = settings.PASSWORD_RESET_URL or request.build_absolute_uri(reverse('recuperar_acceso'))
-            # Tokens in the fragment never reach HTTP access logs or Referer headers.
-            # Older custom schemes are routed through the HTTPS page as well.
-            if urlsplit(base).scheme != 'https':
-                base = request.build_absolute_uri(reverse('recuperar_acceso'))
-            parts = urlsplit(base)
-            link = urlunsplit(('https', parts.netloc, parts.path, '', query))
+            temporal = generar_password_temporal()
             try:
-                send_mail(
-                    'Recuperacion de acceso STREAK',
-                    f'Para cambiar tu contrasena abre este enlace (valido por una hora): {link}',
-                    settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False,
-                    html_message=format_html('<p>Recuperacion de acceso STREAK</p><p><a href="{}">Restablecer contrasena</a></p><p>El enlace vence en una hora.</p>', link),
-                )
+                # Si el correo no sale, se revierte el cambio: la contrasena anterior sigue sirviendo.
+                with transaction.atomic():
+                    user = Usuario.objects.select_for_update().get(pk=user.pk)
+                    user.set_password(temporal)
+                    user.pass_temporal_flag = True
+                    user.pass_temporal_expira = timezone.now() + timedelta(hours=24)
+                    user.save(update_fields=['password', 'pass_temporal_flag', 'pass_temporal_expira'])
+                    send_mail(
+                        'Tu contrasena temporal de STREAK',
+                        f'Tu contrasena temporal es: {temporal}\n'
+                        'Vence en 24 horas. Al iniciar sesion, la app te pedira crear una contrasena nueva.\n'
+                        'Si no solicitaste este cambio, entra con esta contrasena y cambiala.',
+                        settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False,
+                        html_message=format_html(
+                            '<p>Tu contrasena temporal de STREAK es: <strong>{}</strong></p>'
+                            '<p>Vence en 24 horas. Al iniciar sesion, la app te pedira crear una contrasena nueva.</p>'
+                            '<p>Si no solicitaste este cambio, entra con esta contrasena y cambiala.</p>', temporal),
+                    )
             except (SMTPException, OSError, AnymailError):
-                # Do not expose mailbox existence or log reset credentials on mail failure.
+                # No se registran el correo ni la contrasena temporal (RN-02).
                 logging.getLogger(__name__).warning('No se pudo entregar un correo de recuperacion.')
-        return Response({'detail': 'Si el correo esta registrado, recibiras instrucciones para recuperar el acceso.'})
+        return Response({'detail': 'Si el correo esta registrado, recibiras una contrasena temporal.'})
 
 
 class RestablecerPasswordView(views.APIView):
@@ -133,7 +136,8 @@ class RestablecerPasswordView(views.APIView):
         validate_password(data['new_password'], user)
         user.set_password(data['new_password'])
         user.pass_temporal_flag = False
-        user.save(update_fields=['password', 'pass_temporal_flag'])
+        user.pass_temporal_expira = None
+        user.save(update_fields=['password', 'pass_temporal_flag', 'pass_temporal_expira'])
         return Response({'detail': 'Contrasena actualizada. Inicia sesion nuevamente.'})
 
 
@@ -146,9 +150,12 @@ class CambiarPasswordView(views.APIView):
         serializer = CambiarPasswordSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         user = Usuario.objects.select_for_update().get(pk=request.user.pk)
+        if user.pass_temporal_vencida():
+            raise BusinessError('PASSWORD_TEMPORAL_VENCIDA', 'Tu contrasena temporal vencio. Solicita una nueva desde Recuperar contrasena.')
         if not user.check_password(serializer.validated_data['old_password']):
             raise ValidationError({'old_password': ['La contrasena actual no es correcta.']})
         user.set_password(serializer.validated_data['new_password'])
         user.pass_temporal_flag = False
-        user.save(update_fields=['password', 'pass_temporal_flag'])
+        user.pass_temporal_expira = None
+        user.save(update_fields=['password', 'pass_temporal_flag', 'pass_temporal_expira'])
         return Response({'detail': 'Contrasena actualizada. Inicia sesion nuevamente.'})

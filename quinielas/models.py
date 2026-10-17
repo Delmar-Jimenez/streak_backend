@@ -11,6 +11,8 @@ class Usuario(AbstractUser):
     foto = models.ImageField(upload_to='perfiles/', blank=True, null=True)
     es_pro = models.BooleanField(default=False)
     pass_temporal_flag = models.BooleanField(default=False)
+    # RN-06: la contrasena temporal enviada por correo vence a las 24 horas.
+    pass_temporal_expira = models.DateTimeField(null=True, blank=True)
     es_demo = models.BooleanField(default=False, editable=False)
     fecha_nacimiento = models.DateField(null=True, blank=True)
 
@@ -21,6 +23,9 @@ class Usuario(AbstractUser):
 
     def __str__(self):
         return self.username
+
+    def pass_temporal_vencida(self):
+        return bool(self.pass_temporal_flag and self.pass_temporal_expira and timezone.now() >= self.pass_temporal_expira)
 
 class Torneo(models.Model):
     class Formato(models.TextChoices):
