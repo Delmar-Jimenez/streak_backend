@@ -102,6 +102,7 @@ if env_bool('TRUST_PROXY_HTTPS'):
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'anymail.backends.resend.EmailBackend')
 ANYMAIL = {
     'RESEND_API_KEY': os.getenv('RESEND_API_KEY', ''),
+    'BREVO_API_KEY': os.getenv('BREVO_API_KEY', ''),
     'REQUESTS_TIMEOUT': 10,
 }
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')

@@ -67,6 +67,38 @@ ejecutar `python manage.py recalcular_puntos` al terminar.
   repositorio sin cambiar sus nombres. Archivos ya perdidos requieren volver a cargarse.
 - Limites: usar cache compartido/proxy para limitar solicitudes entre replicas.
 
+## Brevo: alternativa gratuita sin dominio propio
+
+El backend admite Brevo por HTTPS usando Anymail, sin dependencias adicionales.
+Antes de cambiar el proveedor en Render, completar el alta gratuita de Brevo,
+verificar el remitente y confirmar que el servicio de correo transaccional esta activo.
+Para esta alternativa se puede verificar un correo existente; Brevo sustituye los
+remitentes gratuitos por una direccion de su dominio como medida temporal.
+Su plan gratuito permite 300 envios diarios; revisar las condiciones vigentes.
+
+Variables del servicio en Render:
+
+```text
+EMAIL_BACKEND=anymail.backends.brevo.EmailBackend
+BREVO_API_KEY=<clave API v3 guardada directamente en Render>
+DEFAULT_FROM_EMAIL=STREAK <correo verificado en Brevo>
+```
+
+Usar una clave API, no la clave SMTP. No registrar claves ni contrasenas en Git o logs.
+Si falta la clave de Brevo o el remitente, recuperacion devuelve 503 para cualquier
+direccion, incluso si sigue configurada una clave de Resend.
+Publicar primero el soporte de Brevo y despues actualizar las variables juntas.
+El valor predeterminado sigue siendo Resend hasta seleccionar Brevo explicitamente.
+
+Probar con una cuenta propia de pruebas: solicitar recuperacion, comprobar entrega
+en los registros transaccionales de Brevo y en el buzon, iniciar sesion con la temporal
+y cambiarla. Una respuesta aceptada por la API solo confirma que se encolo el mensaje,
+no la entrega. Si el proveedor rechaza la solicitud, se conserva la clave anterior.
+No usar cuentas de companeros para pruebas sin su autorizacion.
+
+Documentacion: https://anymail.dev/en/stable/esps/brevo/ y
+https://help.brevo.com/hc/en-us/articles/14925263522578-Comply-with-Gmail-Yahoo-and-Microsoft-s-requirements-for-email-senders
+
 ## Resend y recuperacion de contrasena
 
 El backend usa `anymail.backends.resend.EmailBackend` por defecto. Anymail envia

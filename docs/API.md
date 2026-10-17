@@ -99,7 +99,7 @@ RN-06: auth/recuperar/ genera una contrasena temporal aleatoria de 10 caracteres
 la envia al correo registrado, marca pass_temporal_flag y la hace vencer a las 24 horas
 (pass_temporal_expira). Si el correo no se entrega, el cambio se revierte y la contrasena anterior
 sigue sirviendo. La contrasena temporal nunca se imprime ni se registra en logs.
-Resend entrega el correo por HTTPS. Mientras falte clave o remitente,
+Resend o Brevo entrega el correo por HTTPS, segun EMAIL_BACKEND. Mientras falte la clave del proveedor elegido o el remitente,
 auth/recuperar/ devuelve 503 `CORREO_NO_CONFIGURADO` para cualquier correo.
 Con una temporal vencida, auth/login/ y auth/cambiar-password/ responden 400
 `PASSWORD_TEMPORAL_VENCIDA`: hay que solicitar una nueva. Una temporal marcada a mano desde el
