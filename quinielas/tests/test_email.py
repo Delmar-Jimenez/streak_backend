@@ -26,12 +26,11 @@ class ResendTests(TestCase):
         return self.client.post('/api/auth/recuperar', {'email': email or self.user.email})
 
     @patch('requests.sessions.Session.request')
-    def test_reset_uses_resend_https_and_link_can_reset_password(self, request):
+    def test_recuperacion_envia_contrasena_temporal_por_resend(self, request):
         response = requests.Response()
         response.status_code = 200
         response._content = b'{"id":"email_test"}'
         request.return_value = response
-        original = self.user.password
         with patch('builtins.print') as printed:
             known = self.recover()
             unknown = self.recover('unknown@example.test')
@@ -47,15 +46,13 @@ class ResendTests(TestCase):
         payload = json.loads(call['data'])
         self.assertEqual(payload['to'], [self.user.email])
         self.assertEqual(payload['from'], 'STREAK <soporte@example.test>')
-        link = payload['text'].split()[-1]
-        self.assertTrue(link.startswith('https://testserver/recuperar-acceso/#'))
-        self.assertIn('href=', payload['html'])
+        temporal = payload['text'].split('es: ')[1].split()[0]
+        self.assertEqual(len(temporal), 10)
+        self.assertIn(temporal, payload['html'])
         self.user.refresh_from_db()
-        self.assertEqual(self.user.password, original)
-        query = parse_qs(urlsplit(link).fragment)
-        reset = {'uid': query['uid'][0], 'token': query['token'][0], 'new_password': 'New-password-897!'}
-        self.assertEqual(self.client.post('/api/auth/restablecer', reset).status_code, 200)
-        self.assertEqual(self.client.post('/api/auth/restablecer', reset).status_code, 400)
+        self.assertTrue(self.user.check_password(temporal))
+        self.assertTrue(self.user.pass_temporal_flag)
+        self.assertIsNotNone(self.user.pass_temporal_expira)
 
     @patch('requests.sessions.Session.request')
     def test_missing_configuration_is_unavailable_for_every_address(self, request):

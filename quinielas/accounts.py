@@ -1,9 +1,24 @@
+import secrets
+import string
+
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.contrib.admin.models import LogEntry
 
 from .errors import BusinessError
 from .models import Pago
+
+
+# Sin caracteres que se confunden al leerlos (0/O, 1/l/I).
+ALFABETO_TEMPORAL = ''.join(c for c in string.ascii_letters + string.digits if c not in '0O1lI')
+
+
+def generar_password_temporal(longitud=10):
+    """Contrasena temporal aleatoria (RN-06) con al menos una letra y un numero (RN-03)."""
+    while True:
+        clave = ''.join(secrets.choice(ALFABETO_TEMPORAL) for _ in range(longitud))
+        if any(c.isalpha() for c in clave) and any(c.isdigit() for c in clave):
+            return clave
 
 
 @transaction.atomic

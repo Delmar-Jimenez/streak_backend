@@ -12,7 +12,7 @@ from .models import (
 @admin.register(Usuario)
 class UsuarioAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
-        ('Datos Adicionales', {'fields': ('telefono', 'foto', 'es_pro', 'pass_temporal_flag')}),
+        ('Datos Adicionales', {'fields': ('telefono', 'foto', 'es_pro', 'pass_temporal_flag', 'pass_temporal_expira')}),
     )
     list_display = UserAdmin.list_display + ('telefono', 'es_pro', 'pass_temporal_flag')
 

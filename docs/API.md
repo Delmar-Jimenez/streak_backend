@@ -25,7 +25,7 @@ en esa infraestructura, fuera de Django.
 | POST | auth/register/ | username, email, password; telefono, first_name, last_name y fecha_nacimiento (ISO `YYYY-MM-DD`, opcional, no futura, edad <= 120 anios) opcionales. 201, sin password. |
 | POST | auth/login/ | username, password; devuelve access y refresh. |
 | POST | auth/login/refresh/ | refresh; devuelve access. |
-| POST | auth/recuperar/ | email; respuesta generica 200 y enlace por correo si existe. |
+| POST | auth/recuperar/ | email; respuesta generica 200 y contrasena temporal por correo si existe (RN-06). |
 | POST | auth/restablecer/ | uid, token, new_password del enlace; 200. |
 | POST | auth/cambiar-password/ | old_password, new_password; 200, iniciar sesion nuevamente. |
 | GET, PUT, PATCH | usuarios/me/ | Perfil; expone fecha_nacimiento (`YYYY-MM-DD` o null). PUT/PATCH permiten first_name, last_name, telefono, fecha_nacimiento (misma validacion que el registro; null la borra), foto. |
@@ -95,16 +95,16 @@ un orden estable. Validar ese desempate cuando se reciban las reglas completas.
 
 ## Recuperacion y sesiones
 
-No se genera ni imprime una contrasena temporal. Se envia un enlace de uso unico
-valido por una hora; la contrasena permanece intacta hasta confirmar el token.
-La app recibe uid/token del enlace y los envia a auth/restablecer/.
+RN-06: auth/recuperar/ genera una contrasena temporal aleatoria de 10 caracteres (sin 0, O, 1, l, I),
+la envia al correo registrado, marca pass_temporal_flag y la hace vencer a las 24 horas
+(pass_temporal_expira). Si el correo no se entrega, el cambio se revierte y la contrasena anterior
+sigue sirviendo. La contrasena temporal nunca se imprime ni se registra en logs.
 Resend entrega el correo por HTTPS. Mientras falte clave o remitente,
 auth/recuperar/ devuelve 503 `CORREO_NO_CONFIGURADO` para cualquier correo.
-El correo incluye HTML y un enlace HTTPS a /recuperar-acceso/ en este backend.
-La pagina permite solicitar el correo y cambiar la contrasena sin instalar la app.
-uid y token viajan en el fragmento (#), no en la consulta HTTP, para evitar logs.
-PASSWORD_RESET_URL permite sustituir esta pagina por otra HTTPS con el mismo contrato.
-PASSWORD_RESET_APP_URL agrega un boton opcional a un deep link streak:// ya implementado.
+Con una temporal vencida, auth/login/ y auth/cambiar-password/ responden 400
+`PASSWORD_TEMPORAL_VENCIDA`: hay que solicitar una nueva. Una temporal marcada a mano desde el
+admin (sin fecha de vencimiento) no vence.
+auth/restablecer/ y la pagina /recuperar-acceso/ siguen disponibles para enlaces ya emitidos.
 GET usuarios/me/ funciona con contrasena temporal y expone pass_temporal_flag.
 Las operaciones restringidas devuelven 403 PASSWORD_TEMPORAL. El usuario puede
 cambiar su clave o eliminar su propia cuenta sin desbloquear el resto de la API.

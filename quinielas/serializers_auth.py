@@ -5,9 +5,11 @@ from django.contrib.auth.password_validation import validate_password
 from django.db import IntegrityError, transaction
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.utils import get_md5_hash_password
+
+from .errors import BusinessError
 
 Usuario = get_user_model()
 
@@ -97,3 +99,16 @@ class SecureTokenRefreshSerializer(TokenRefreshSerializer):
         if token.get(api_settings.REVOKE_TOKEN_CLAIM) != get_md5_hash_password(user.password):
             raise AuthenticationFailed('La contrasena cambio. Inicia sesion nuevamente.')
         return super().validate(attrs)
+
+
+class LoginSerializer(TokenObtainPairSerializer):
+    """Login que rechaza una contrasena temporal vencida (RN-06: vence a las 24 horas)."""
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        if self.user.pass_temporal_vencida():
+            raise BusinessError(
+                'PASSWORD_TEMPORAL_VENCIDA',
+                'Tu contrasena temporal vencio. Solicita una nueva desde Recuperar contrasena.',
+            )
+        return data
