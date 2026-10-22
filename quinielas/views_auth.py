@@ -79,11 +79,12 @@ class RecuperarPasswordView(views.APIView):
     def post(self, request):
         serializer = RecuperarPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        resend_without_key = (
-            settings.EMAIL_BACKEND == 'anymail.backends.resend.EmailBackend'
-            and not settings.ANYMAIL.get('RESEND_API_KEY')
-        )
-        if not settings.DEFAULT_FROM_EMAIL or resend_without_key:
+        provider_key = {
+            'anymail.backends.resend.EmailBackend': 'RESEND_API_KEY',
+            'anymail.backends.brevo.EmailBackend': 'BREVO_API_KEY',
+        }.get(settings.EMAIL_BACKEND)
+        missing_key = provider_key and not settings.ANYMAIL.get(provider_key)
+        if not settings.DEFAULT_FROM_EMAIL or missing_key:
             raise BusinessError('CORREO_NO_CONFIGURADO', 'La recuperacion no esta disponible.', 503)
         # RN-06: se genera una contrasena temporal de 10 caracteres, se envia al correo registrado,
         # se marca pass_temporal_flag y vence a las 24 horas. La respuesta no revela si el correo existe.
