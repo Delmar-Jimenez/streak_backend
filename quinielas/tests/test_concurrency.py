@@ -18,8 +18,9 @@ class ConcurrencyTests(TransactionTestCase):
         self.b = Usuario.objects.create_user('b')
         self.torneo = Torneo.objects.create(nombre='Liga', temporada='2026', estado='ACTIVO')
         self.fase = Fase.objects.create(torneo=self.torneo, nombre='Fase', orden=1, tipo='LIGA')
-        self.local = Equipo.objects.create(torneo=self.torneo, nombre='Local')
-        self.visita = Equipo.objects.create(torneo=self.torneo, nombre='Visita')
+        self.local = Equipo.objects.create(nombre='Local')
+        self.visita = Equipo.objects.create(nombre='Visita')
+        self.torneo.equipos.add(self.local, self.visita)
         self.quiniela = Quiniela.objects.create(torneo=self.torneo, creador=self.owner, nombre='Amigos', codigo_unico='ABC123', max_participantes=2)
         self.member = Participante.objects.create(quiniela=self.quiniela, usuario=self.owner)
 

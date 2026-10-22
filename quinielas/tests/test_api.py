@@ -24,8 +24,9 @@ class ApiTests(TestCase):
         self.outsider = Usuario.objects.create_user('otro', 'otro@example.test', 'Strong-password-94!')
         self.torneo = Torneo.objects.create(nombre='Liga', temporada='2026', estado='ACTIVO')
         self.fase = Fase.objects.create(torneo=self.torneo, nombre='Jornada', orden=1, tipo='LIGA')
-        self.local = Equipo.objects.create(torneo=self.torneo, nombre='Local')
-        self.visita = Equipo.objects.create(torneo=self.torneo, nombre='Visita')
+        self.local = Equipo.objects.create(nombre='Local')
+        self.visita = Equipo.objects.create(nombre='Visita')
+        self.torneo.equipos.add(self.local, self.visita)
         self.partido = Partido.objects.create(
             torneo=self.torneo, fase=self.fase, equipo_local=self.local, equipo_visita=self.visita,
             fecha_hora=timezone.now() + timedelta(hours=2),
