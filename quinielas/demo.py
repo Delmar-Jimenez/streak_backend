@@ -46,7 +46,15 @@ def cargar_demo():
         Torneo.objects.select_for_update().get(pk=torneo.pk)
         teams = []
         for team_index, name in enumerate(('Aurora', 'Volcan', 'Costa', 'Altiplano', 'Bosque', 'Lago', 'Estrella', 'Valle')):
-            team, created = Equipo.objects.get_or_create(torneo=torneo, nombre=f'DEMO {name}')
+            # Reuse already enrolled legacy demo teams; new demos share the global team.
+            team = torneo.equipos.filter(nombre=f'DEMO {name}').first()
+            created = False
+            if team is None:
+                team = Equipo.objects.filter(nombre=f'DEMO {name}', torneos__demo_clave__startswith='streak-demo-').first()
+                if team is None:
+                    team = Equipo.objects.create(nombre=f'DEMO {name}')
+                    created = True
+                torneo.equipos.add(team)
             if created or not team.escudo:
                 team.escudo.save(f'demo-{team_index}.png', escudo_demo(team_index))
             teams.append(team)
@@ -72,4 +80,5 @@ def cargar_demo():
                     Pronostico.objects.get_or_create(participante=member, partido=match, defaults={
                         'goles_local_pred': (2, 3, 1, 0)[player_index], 'goles_visita_pred': 1,
                     })
-    return {'torneos': 3, 'equipos': 24, 'partidos': 24, 'usuarios': [user.username for user in users]}
+    return {'torneos': 3, 'equipos': Equipo.objects.filter(torneos__demo_clave__startswith='streak-demo-').distinct().count(),
+            'partidos': 24, 'usuarios': [user.username for user in users]}

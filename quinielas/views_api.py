@@ -9,15 +9,42 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .errors import BusinessError
-from .models import Torneo, Partido, Quiniela, Participante, Pronostico, Pago
+from .models import Torneo, Partido, Quiniela, Participante, Pronostico, Pago, Equipo, Pais
 from .serializers import (
     TorneoSerializer, PartidoSerializer, QuinielaSerializer, PronosticoSerializer,
-    EquipoSerializer, FaseSerializer, ParticipanteSerializer, PagoSerializer, UnirseSerializer,
+    EquipoSerializer, FaseSerializer, ParticipanteSerializer, PagoSerializer, UnirseSerializer, PaisSerializer,
 )
 
 
 def torneos_visibles():
-    return Torneo.objects.exclude(estado=Torneo.Estado.BORRADOR)
+    return Torneo.objects.exclude(estado=Torneo.Estado.BORRADOR).select_related('pais')
+
+
+def filtrar_pais(request, queryset):
+    pais = request.query_params.get('pais')
+    if pais is None:
+        return queryset
+    try:
+        pais_id = int(pais)
+        if not 0 < pais_id < 2**63:
+            raise ValueError
+    except ValueError:
+        raise BusinessError('PAIS_INVALIDO', 'El país debe ser un identificador válido.')
+    get_object_or_404(Pais, pk=pais_id)
+    return queryset.filter(pais_id=pais_id)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def pais_list(request):
+    return Response(PaisSerializer(Pais.objects.all(), many=True).data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def equipo_list(request):
+    equipos = filtrar_pais(request, Equipo.objects.select_related('pais'))
+    return Response(EquipoSerializer(equipos, many=True, context={'request': request}).data)
 
 
 def membresia(user, pk):
@@ -25,7 +52,8 @@ def membresia(user, pk):
 
 
 def filtrar_partidos(request, torneo):
-    partidos = torneo.partidos.select_related('equipo_local', 'equipo_visita', 'fase').order_by('fecha_hora', 'id')
+    partidos = torneo.partidos.select_related('equipo_local__pais', 'equipo_visita__pais', 'fase').prefetch_related(
+        'equipo_local__inscripciones_torneos', 'equipo_visita__inscripciones_torneos').order_by('fecha_hora', 'id')
     estado = request.query_params.get('estado')
     if estado is not None:
         if estado not in Partido.Estado.values:
@@ -60,7 +88,7 @@ def estado_pronostico(pronostico, partido, es_propio, ahora):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def torneo_list(request):
-    return Response(TorneoSerializer(torneos_visibles().order_by('id'), many=True).data)
+    return Response(TorneoSerializer(filtrar_pais(request, torneos_visibles()).order_by('id'), many=True).data)
 
 
 @api_view(['GET'])
@@ -73,7 +101,8 @@ def torneo_detail(request, pk):
 @permission_classes([AllowAny])
 def torneo_equipos(request, pk):
     torneo = get_object_or_404(torneos_visibles(), pk=pk)
-    return Response(EquipoSerializer(torneo.equipos.order_by('nombre', 'id'), many=True, context={'request': request}).data)
+    equipos = torneo.equipos.select_related('pais').prefetch_related('inscripciones_torneos').order_by('nombre', 'id')
+    return Response(EquipoSerializer(equipos, many=True, context={'request': request, 'torneo_id': torneo.pk}).data)
 
 
 @api_view(['GET'])

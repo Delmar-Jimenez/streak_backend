@@ -178,11 +178,39 @@ Estas migraciones no cambian DATABASE_URL ni el proveedor de base de datos.
 Con autorizacion del titular y respaldo previo, ejecutar `python manage.py cargar_demo`
 o abrir /admin/quinielas/torneo/demo/ como superusuario y confirmar. Es repetible,
 no sobrescribe datos existentes. Crea tres torneos DEMO (dos activos, uno finalizado),
-ocho equipos con escudos por torneo, fases, 24 partidos y cuatro usuarios marcados DEMO.
+ocho equipos compartidos con escudos, 24 inscripciones entre los tres torneos,
+fases, 24 partidos y cuatro usuarios marcados DEMO.
 Los usuarios demo_streak_ana, demo_streak_bruno, demo_streak_carla y demo_streak_diego
 no reciben contrasenas predeterminadas. El titular debe asignarlas personalmente
 desde el administrador para iniciar sesion en la app; Ana tiene PRO de demostracion.
 Sus quinielas usan DMALFA, DMBETA y DMGAMA. No se hacen cobros ni se envian correos.
+
+## Migración 0011: equipos reutilizables
+
+Esta migración crea países e inscripciones `EquipoTorneo`, copia cada relación
+equipo-torneo y su grupo antes de quitar esos campos del equipo. Conserva los ids,
+escudos, partidos, pronósticos y puntuaciones. No deduce países por nombres ni
+fusiona equipos existentes: dos equipos llamados Barcelona podrían ser entidades
+distintas. Los datos heredados se pueden clasificar después desde Django.
+
+Antes de aplicarla en producción, crear y verificar un respaldo completo de
+PostgreSQL. Usar una ventana de mantenimiento y detener la versión antigua antes
+de migrar: el código antiguo consulta `Equipo.torneo` y `Equipo.grupo`, campos que
+ya no existen después de 0011. Un despliegue de Render con ambas versiones
+atendiendo simultáneamente no es compatible con este cambio.
+
+Orden: detener escrituras/versión antigua, respaldar, ejecutar `migrate --noinput`
+con el nuevo código, iniciar la versión nueva, verificar el panel, los selectores
+dependientes y las rutas de API, y reabrir el servicio. No basta un rollback de
+código. La reversión de 0011 conserva los datos solo mientras cada equipo tenga
+exactamente una inscripción; después de reutilizar equipos o crear equipos sin
+torneo, se necesita restaurar el respaldo completo junto con la versión anterior.
+
+En el panel: crear países (ej. GT, ES), clasificar primero los equipos existentes,
+asignar luego país a los torneos nacionales y agregar inscripciones desde
+**Equipos por torneo**. Crear un equipo nuevo no exige un torneo. Para un torneo
+internacional, dejar vacío el país. No se permite eliminar desde el panel una
+inscripción usada en partidos ni mover una fase con partidos a otro torneo.
 
 ## Render y GitHub
 

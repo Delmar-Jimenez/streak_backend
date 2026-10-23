@@ -38,8 +38,9 @@ class PartidoDesdeAdminTests(TestCase):
         self.client.force_login(admin)
         self.torneo = Torneo.objects.create(nombre='Liga', temporada='2026', estado='ACTIVO')
         self.fase = Fase.objects.create(torneo=self.torneo, nombre='Jornada 1', orden=1, tipo='LIGA')
-        self.local = Equipo.objects.create(torneo=self.torneo, nombre='Local')
-        self.visita = Equipo.objects.create(torneo=self.torneo, nombre='Visita')
+        self.local = Equipo.objects.create(nombre='Local')
+        self.visita = Equipo.objects.create(nombre='Visita')
+        self.torneo.equipos.add(self.local, self.visita)
 
     def test_hora_local_del_admin_se_guarda_en_utc(self):
         respuesta = self.client.post(reverse('admin:quinielas_partido_add'), {

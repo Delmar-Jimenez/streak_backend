@@ -30,9 +30,11 @@ en esa infraestructura, fuera de Django.
 | POST | auth/cambiar-password/ | old_password, new_password; 200, iniciar sesion nuevamente. |
 | GET, PUT, PATCH | usuarios/me/ | Perfil; expone fecha_nacimiento (`YYYY-MM-DD` o null). PUT/PATCH permiten first_name, last_name, telefono, fecha_nacimiento (misma validacion que el registro; null la borra), foto. |
 | DELETE | usuarios/me/ | password actual y confirmar: true. Eliminacion permanente; 204. |
-| GET | torneos/ | Torneos activos/finalizados. |
+| GET | paises/ | Países disponibles: id, nombre y codigo ISO de dos letras. |
+| GET | equipos/ | Equipos reutilizables, incluso sin torneo. Filtro opcional pais={id}. |
+| GET | torneos/ | Torneos activos/finalizados. Filtro opcional pais={id}. |
 | GET | torneos/{id}/ | Detalle del torneo. |
-| GET | torneos/{id}/equipos/ | Equipos y escudos. |
+| GET | torneos/{id}/equipos/ | Equipos inscritos, escudos y grupo específico del torneo. |
 | GET | torneos/{id}/fases/ | Fases ordenadas. |
 | GET | torneos/{id}/partidos/ | Filtros opcionales estado y fase. |
 | GET | partidos/{id}/ | Detalle del partido. |
@@ -63,6 +65,31 @@ Los detalles incluyen todos los participantes/partidos aunque no tengan pronosti
 Un pronostico ausente u oculto se representa con null y puntos_obtenidos=0.
 `estado_pronostico` distingue VISIBLE, NO_REGISTRADO y OCULTO. Antes del inicio,
 todos los rivales son OCULTO, sin revelar si ya pronosticaron.
+
+## Equipos compartidos y países
+
+Un equipo existe una sola vez y se puede inscribir en varios torneos mediante
+`EquipoTorneo`. El grupo pertenece a esa inscripción. En Django se administran
+por separado **Equipos** (nombre, escudo y país) y **Equipos por torneo** (torneo,
+equipo existente y grupo). La pantalla del torneo incluye únicamente sus fases
+como registros relacionados. Al crear un partido, las opciones de fases y equipos
+se actualizan al elegir el torneo; el servidor también valida esa relación.
+
+Equipos y torneos incluyen `pais` (id o null) y `pais_detalle` (id, nombre, codigo
+o null). Un torneo con país admite equipos de ese país. Un torneo sin país permite
+equipos internacionales; los datos anteriores quedan sin país hasta clasificarlos.
+`pais` inválido devuelve 400; un id de país inexistente devuelve 404.
+
+Para mantener el contrato móvil, las respuestas de equipos conservan `torneo` y
+`grupo`: en `/torneos/{id}/equipos/` y en los detalles anidados de partidos describen
+el torneo consultado. En `/equipos/` ambos son null: no hay un torneo propietario.
+El mismo `id` de equipo aparece en todas sus competiciones. Los ids antiguos no se
+cambian ni se fusionan automáticamente por coincidencias de nombre.
+
+Para poblar selectores: consultar `/paises/`, después `/torneos/?pais={id}` o
+`/equipos/?pais={id}`, y finalmente `/torneos/{id}/fases/` y
+`/torneos/{id}/equipos/`. La administración de estos registros sigue restringida
+al panel con permisos; estos endpoints públicos son de solo lectura.
 Participantes y tablas incluyen foto y es_pro. Los partidos incluyen
 equipo_local_detalle/equipo_visita_detalle con nombre y escudo, manteniendo los IDs.
 `mias` e `historial` incluyen torneo_nombre, cantidad_inscritos, mis_puntos y mi_posicion.

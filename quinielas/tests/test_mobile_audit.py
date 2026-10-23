@@ -287,7 +287,7 @@ class DemoTests(TestCase):
         self.assertEqual(Usuario.objects.filter(es_demo=True).count(), 4)
         self.assertEqual(Usuario.objects.filter(es_demo=True, es_pro=True).count(), 1)
         self.assertTrue(all(not u.has_usable_password() for u in Usuario.objects.all()))
-        self.assertEqual(ImagenArchivo.objects.count(), 24)
+        self.assertEqual(ImagenArchivo.objects.count(), 8)
 
     def test_demo_admin_requires_superuser(self):
         user = Usuario.objects.create_user('staff', is_staff=True)

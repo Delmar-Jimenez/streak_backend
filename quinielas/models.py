@@ -27,6 +27,28 @@ class Usuario(AbstractUser):
     def pass_temporal_vencida(self):
         return bool(self.pass_temporal_flag and self.pass_temporal_expira and timezone.now() >= self.pass_temporal_expira)
 
+class Pais(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+    codigo = models.CharField(max_length=2, unique=True, help_text='Código ISO de dos letras, por ejemplo GT o ES.')
+
+    class Meta:
+        verbose_name = 'país'
+        verbose_name_plural = 'países'
+        ordering = ['nombre']
+
+    def clean(self):
+        self.codigo = self.codigo.strip().upper()
+        if len(self.codigo) != 2 or not self.codigo.isascii() or not self.codigo.isalpha():
+            raise ValidationError({'codigo': 'Usa dos letras, por ejemplo GT o ES.'})
+
+    def save(self, *args, **kwargs):
+        self.codigo = self.codigo.strip().upper()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.nombre
+
+
 class Torneo(models.Model):
     class Formato(models.TextChoices):
         LIGA = 'LIGA', _('Liga')
@@ -38,22 +60,63 @@ class Torneo(models.Model):
         FINALIZADO = 'FINALIZADO', _('Finalizado')
 
     nombre = models.CharField(max_length=255)
+    pais = models.ForeignKey(Pais, on_delete=models.PROTECT, related_name='torneos', null=True, blank=True,
+                             help_text='Déjalo vacío para torneos internacionales o pendientes de clasificar.')
+    equipos = models.ManyToManyField('Equipo', through='EquipoTorneo', related_name='torneos', blank=True)
     formato = models.CharField(max_length=50, choices=Formato.choices, default=Formato.LIGA)
     temporada = models.CharField(max_length=50)
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.BORRADOR)
     demo_clave = models.CharField(max_length=50, unique=True, null=True, blank=True, editable=False)
 
+    def clean(self):
+        if self.pk and self.pais_id and self.equipos.exclude(pais_id=self.pais_id).exists():
+            raise ValidationError({'pais': 'Todos los equipos inscritos deben tener el país del torneo. Clasifica primero los equipos o deja el torneo sin país si es internacional.'})
+
     def __str__(self):
         return f"{self.nombre} - {self.temporada}"
 
 class Equipo(models.Model):
-    torneo = models.ForeignKey(Torneo, on_delete=models.CASCADE, related_name='equipos')
     nombre = models.CharField(max_length=255)
+    pais = models.ForeignKey(Pais, on_delete=models.PROTECT, related_name='equipos', null=True, blank=True)
     escudo = models.ImageField(upload_to='escudos/', blank=True, null=True)
-    grupo = models.CharField(max_length=50, blank=True, null=True)
+
+    class Meta:
+        ordering = ['nombre', 'id']
+
+    def clean(self):
+        if self.pk and self.torneos.filter(pais__isnull=False).exclude(pais_id=self.pais_id).exists():
+            raise ValidationError({'pais': 'El país debe coincidir con los torneos nacionales donde está inscrito.'})
 
     def __str__(self):
         return self.nombre
+
+
+class EquipoTorneo(models.Model):
+    torneo = models.ForeignKey(Torneo, on_delete=models.CASCADE, related_name='inscripciones_equipos')
+    equipo = models.ForeignKey(Equipo, on_delete=models.PROTECT, related_name='inscripciones_torneos')
+    grupo = models.CharField(max_length=50, blank=True, null=True)
+
+    class Meta:
+        verbose_name = 'equipo por torneo'
+        verbose_name_plural = 'equipos por torneo'
+        constraints = [models.UniqueConstraint(fields=['torneo', 'equipo'], name='equipo_torneo_unico')]
+
+    def clean(self):
+        if self.torneo_id and self.equipo_id:
+            if self.torneo.pais_id and self.equipo.pais_id != self.torneo.pais_id:
+                raise ValidationError({'equipo': 'Selecciona un equipo del país del torneo.'})
+        if self.pk:
+            original = type(self).objects.get(pk=self.pk)
+            if (original.torneo_id, original.equipo_id) != (self.torneo_id, self.equipo_id) and original.tiene_partidos():
+                raise ValidationError('Esta inscripción tiene partidos. Crea otra inscripción sin modificar la existente.')
+
+    def tiene_partidos(self):
+        return Partido.objects.filter(torneo_id=self.torneo_id).filter(
+            models.Q(equipo_local_id=self.equipo_id) | models.Q(equipo_visita_id=self.equipo_id)
+        ).exists()
+
+    def __str__(self):
+        return f'{self.equipo} — {self.torneo}'
 
 class Fase(models.Model):
     class Tipo(models.TextChoices):
@@ -65,6 +128,10 @@ class Fase(models.Model):
     nombre = models.CharField(max_length=100)
     orden = models.IntegerField()
     tipo = models.CharField(max_length=50, choices=Tipo.choices)
+
+    def clean(self):
+        if self.pk and self.partidos.exclude(torneo_id=self.torneo_id).exists():
+            raise ValidationError({'torneo': 'Esta fase tiene partidos en otro torneo. No se puede mover.'})
 
     def save(self, *args, **kwargs):
         if self.tipo not in self.Tipo.values:
@@ -88,8 +155,8 @@ class Partido(models.Model):
 
     torneo = models.ForeignKey(Torneo, on_delete=models.CASCADE, related_name='partidos')
     fase = models.ForeignKey(Fase, on_delete=models.CASCADE, related_name='partidos')
-    equipo_local = models.ForeignKey(Equipo, on_delete=models.CASCADE, related_name='partidos_local')
-    equipo_visita = models.ForeignKey(Equipo, on_delete=models.CASCADE, related_name='partidos_visita')
+    equipo_local = models.ForeignKey(Equipo, on_delete=models.PROTECT, related_name='partidos_local')
+    equipo_visita = models.ForeignKey(Equipo, on_delete=models.PROTECT, related_name='partidos_visita')
     fecha_hora = models.DateTimeField()
     goles_local = models.IntegerField(null=True, blank=True)
     goles_visita = models.IntegerField(null=True, blank=True)
@@ -112,9 +179,12 @@ class Partido(models.Model):
         errors = {}
         if self.equipo_local_id == self.equipo_visita_id:
             errors['equipo_visita'] = 'Los equipos deben ser diferentes.'
-        for field in ('equipo_local', 'equipo_visita', 'fase'):
-            if getattr(self, f'{field}_id') and getattr(self, field).torneo_id != self.torneo_id:
-                errors[field] = 'Debe pertenecer al mismo torneo.'
+        if self.fase_id and self.fase.torneo_id != self.torneo_id:
+            errors['fase'] = 'Debe pertenecer al mismo torneo.'
+        for field in ('equipo_local', 'equipo_visita'):
+            equipo_id = getattr(self, f'{field}_id')
+            if equipo_id and self.torneo_id and not EquipoTorneo.objects.filter(torneo_id=self.torneo_id, equipo_id=equipo_id).exists():
+                errors[field] = 'El equipo debe estar inscrito en este torneo.'
         for field in ('goles_local', 'goles_visita'):
             value = getattr(self, field)
             if value is not None and value < 0:

@@ -22,6 +22,8 @@ routes = [
     ('usuarios/me/', PerfilView.as_view(), 'usuario_me'),
 
 
+    ('paises/', views_api.pais_list, 'pais_list'),
+    ('equipos/', views_api.equipo_list, 'equipo_list'),
     ('torneos/', views_api.torneo_list, 'torneo_list'),
     ('torneos/<int:pk>/', views_api.torneo_detail, 'torneo_detail'),
     ('torneos/<int:pk>/equipos/', views_api.torneo_equipos, 'torneo_equipos'),

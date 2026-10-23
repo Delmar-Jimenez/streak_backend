@@ -2,19 +2,41 @@ import secrets
 
 from django.db import IntegrityError, transaction
 from rest_framework import serializers
-from .models import Torneo, Equipo, Fase, Quiniela, Partido, Pronostico, Participante, Pago
+from .models import Torneo, Equipo, Fase, Quiniela, Partido, Pronostico, Participante, Pago, Pais
+
+
+class PaisSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Pais
+        fields = ('id', 'nombre', 'codigo')
 
 
 class TorneoSerializer(serializers.ModelSerializer):
+    pais_detalle = PaisSerializer(source='pais', read_only=True)
+
     class Meta:
         model = Torneo
-        fields = '__all__'
+        fields = ('id', 'nombre', 'formato', 'temporada', 'estado', 'demo_clave', 'pais', 'pais_detalle')
 
 
 class EquipoSerializer(serializers.ModelSerializer):
+    pais_detalle = PaisSerializer(source='pais', read_only=True)
+    # These legacy fields describe the requested tournament, never ownership of the team.
+    torneo = serializers.SerializerMethodField()
+    grupo = serializers.SerializerMethodField()
+
+    def get_torneo(self, obj):
+        return self.context.get('torneo_id')
+
+    def get_grupo(self, obj):
+        torneo_id = self.context.get('torneo_id')
+        if torneo_id is None:
+            return None
+        return next((entry.grupo for entry in obj.inscripciones_torneos.all() if entry.torneo_id == torneo_id), None)
+
     class Meta:
         model = Equipo
-        fields = '__all__'
+        fields = ('id', 'nombre', 'escudo', 'pais', 'pais_detalle', 'torneo', 'grupo')
 
 
 class FaseSerializer(serializers.ModelSerializer):
@@ -28,8 +50,14 @@ class FaseSerializer(serializers.ModelSerializer):
 
 
 class PartidoSerializer(serializers.ModelSerializer):
-    equipo_local_detalle = EquipoSerializer(source='equipo_local', read_only=True)
-    equipo_visita_detalle = EquipoSerializer(source='equipo_visita', read_only=True)
+    equipo_local_detalle = serializers.SerializerMethodField()
+    equipo_visita_detalle = serializers.SerializerMethodField()
+
+    def get_equipo_local_detalle(self, obj):
+        return EquipoSerializer(obj.equipo_local, context={**self.context, 'torneo_id': obj.torneo_id}).data
+
+    def get_equipo_visita_detalle(self, obj):
+        return EquipoSerializer(obj.equipo_visita, context={**self.context, 'torneo_id': obj.torneo_id}).data
     fase_tipo = serializers.CharField(source='fase.tipo', read_only=True)
     cierre_pronosticos = serializers.DateTimeField(read_only=True)
     pronosticos_abiertos = serializers.BooleanField(read_only=True)
