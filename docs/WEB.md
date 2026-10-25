@@ -58,3 +58,10 @@ con sesión y compatibilidad JWT. Las pruebas de concurrencia necesitan PostgreS
 Render Free puede suspender el proceso por inactividad y tardar en responder al
 primer acceso. La web comparte los límites del servicio existente. No cambiar el
 plan ni contratar un dominio para publicar esta implementación.
+
+## Ampliación PRO y filtros
+
+La web incorpora `#estadisticas` (Mi rendimiento), exportaciones CSV y calendario
+de cierres para cuentas PRO. Torneos permite filtrar por temporada y formato;
+el calendario de cada torneo y quiniela añade filtros por grupo y equipo.
+El contrato compartido con la app y sus límites está en [PRO_Y_FILTROS.md](PRO_Y_FILTROS.md).

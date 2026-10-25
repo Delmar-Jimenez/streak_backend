@@ -211,3 +211,9 @@ Esta implementacion no sustituye la integracion Flutter ni la revision de Google
 Referencias: [PaymentIntents](https://docs.stripe.com/api/payment_intents),
 [SDK Python](https://github.com/stripe/stripe-python),
 [errores DRF](https://www.django-rest-framework.org/api-guide/exceptions/).
+
+## Herramientas PRO y filtros de competición
+
+Consulta [PRO_Y_FILTROS.md](PRO_Y_FILTROS.md) para las nuevas capacidades del plan,
+estadísticas, exportaciones CSV, calendario ICS y filtros por temporada, formato,
+fase, grupo y equipo. Los endpoints anteriores mantienen sus campos y rutas.
