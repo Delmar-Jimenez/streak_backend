@@ -62,6 +62,6 @@ plan ni contratar un dominio para publicar esta implementación.
 ## Ampliación PRO y filtros
 
 La web incorpora `#estadisticas` (Mi rendimiento), exportaciones CSV y calendario
-de cierres para cuentas PRO. Torneos permite filtrar por temporada y formato;
+de cierres para cuentas PRO. Torneos permite filtrar por clubes/selecciones, temporada y formato;
 el calendario de cada torneo y quiniela añade filtros por grupo y equipo.
 El contrato compartido con la app y sus límites está en [PRO_Y_FILTROS.md](PRO_Y_FILTROS.md).

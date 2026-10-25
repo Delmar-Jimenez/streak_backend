@@ -36,6 +36,7 @@ class LegacyMigrationTests(TransactionTestCase):
             executor = MigrationExecutor(connection)
             executor.migrate(latest)
             new_apps = executor.loader.project_state(latest).apps
+            self.assertEqual(new_apps.get_model('quinielas', 'Torneo').objects.get(pk=torneo.pk).tipo_participantes, 'SIN_CLASIFICAR')
             self.assertEqual(new_apps.get_model('quinielas', 'Fase').objects.get(pk=fase.pk).tipo, 'LIGA')
             self.assertTrue(new_apps.get_model('quinielas', 'ImagenArchivo').objects.filter(pk='escudos/marquense.png').exists())
             self.assertEqual(new_apps.get_model('quinielas', 'Participante').objects.get(pk=member.pk).puntos_totales, 5)

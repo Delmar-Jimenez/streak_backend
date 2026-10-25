@@ -18,7 +18,7 @@ class ProFiltersTests(TestCase):
         self.client = APIClient()
         self.user = Usuario.objects.create_user('pro', 'pro@example.test', 'Local!482Seguro', es_pro=True)
         self.other = Usuario.objects.create_user('other', 'other@example.test', 'Local!482Seguro')
-        self.t = Torneo.objects.create(nombre='Copa del Mundo de prueba', temporada='2026', estado='ACTIVO', formato='GRUPOS_ELIMINATORIA')
+        self.t = Torneo.objects.create(nombre='Copa del Mundo de prueba', temporada='2026', estado='ACTIVO', formato='GRUPOS_ELIMINATORIA', tipo_participantes='SELECCIONES')
         self.draft = Torneo.objects.create(nombre='Mundial sin publicar', temporada='2030')
         self.group = Fase.objects.create(torneo=self.t, nombre='Grupos', tipo='GRUPOS', orden=1)
         self.knockout = Fase.objects.create(torneo=self.t, nombre='Final', tipo='ELIMINATORIA', orden=2)
@@ -64,6 +64,17 @@ class ProFiltersTests(TestCase):
             self.assertEqual(self.client.get(path, {'equipo':'-1'}).status_code, 400)
         self.assertIsNone(self.client.get(f'/api/partidos/{self.final.pk}/').json()['grupo'])
         self.assertIsNone(self.client.get(f'/api/partidos/{self.cross.pk}/').json()['grupo'])
+
+    def test_clubs_and_national_teams_are_explicit_and_independent_of_format(self):
+        club = Torneo.objects.create(nombre='Mundial de clubes de prueba', temporada='2026', estado='ACTIVO',
+                                    formato='GRUPOS_ELIMINATORIA', tipo_participantes='CLUBES')
+        legacy = Torneo.objects.create(nombre='Sin categoría', temporada='2026', estado='ACTIVO')
+        for category, expected in [('CLUBES', club.pk), ('SELECCIONES', self.t.pk), ('SIN_CLASIFICAR', legacy.pk)]:
+            rows = self.client.get('/api/torneos/', {'tipo_participantes': category}).json()
+            self.assertEqual([row['id'] for row in rows], [expected])
+            self.assertEqual(rows[0]['tipo_participantes'], category)
+        self.assertEqual(self.client.get('/api/torneos/?tipo_participantes=unknown').status_code, 400)
+        self.assertEqual(self.client.get(f'/api/torneos/{self.t.pk}/filtros/').json()['tipo_participantes'], 'SELECCIONES')
 
     def test_own_finalized_stats_and_corrected_results(self):
         self.prediction()

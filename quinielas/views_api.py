@@ -110,7 +110,8 @@ def estado_pronostico(pronostico, partido, es_propio, ahora):
 @permission_classes([AllowAny])
 def torneo_list(request):
     tournaments = filtrar_pais(request, torneos_visibles())
-    for field, choices in [('formato', Torneo.Formato.values), ('estado', ['ACTIVO', 'FINALIZADO'])]:
+    for field, choices in [('formato', Torneo.Formato.values), ('estado', ['ACTIVO', 'FINALIZADO']),
+                           ('tipo_participantes', Torneo.TipoParticipantes.values)]:
         value = request.query_params.get(field)
         if value is not None:
             if value not in choices:
@@ -128,7 +129,7 @@ def torneo_list(request):
 def torneo_filtros(request, pk):
     torneo = get_object_or_404(torneos_visibles(), pk=pk)
     groups = torneo.inscripciones_equipos.exclude(grupo__isnull=True).exclude(grupo='').values_list('grupo', flat=True)
-    return Response({'torneo': torneo.pk, 'formato': torneo.formato,
+    return Response({'torneo': torneo.pk, 'formato': torneo.formato, 'tipo_participantes': torneo.tipo_participantes,
         'fases': FaseSerializer(torneo.fases.all(), many=True).data,
         'grupos': sorted({g.strip().upper() for g in groups if g.strip()}),
         'equipos': list(torneo.equipos.order_by('nombre', 'id').values('id', 'nombre')),

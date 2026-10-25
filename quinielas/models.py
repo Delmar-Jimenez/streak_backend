@@ -50,6 +50,11 @@ class Pais(models.Model):
 
 
 class Torneo(models.Model):
+    class TipoParticipantes(models.TextChoices):
+        SIN_CLASIFICAR = 'SIN_CLASIFICAR', _('Sin clasificar')
+        CLUBES = 'CLUBES', _('Clubes')
+        SELECCIONES = 'SELECCIONES', _('Selecciones nacionales')
+
     class Formato(models.TextChoices):
         LIGA = 'LIGA', _('Liga')
         GRUPOS_ELIMINATORIA = 'GRUPOS_ELIMINATORIA', _('Grupos y Eliminatoria')
@@ -64,6 +69,9 @@ class Torneo(models.Model):
                              help_text='Déjalo vacío para torneos internacionales o pendientes de clasificar.')
     equipos = models.ManyToManyField('Equipo', through='EquipoTorneo', related_name='torneos', blank=True)
     formato = models.CharField(max_length=50, choices=Formato.choices, default=Formato.LIGA)
+    tipo_participantes = models.CharField(max_length=20, choices=TipoParticipantes.choices,
+        default=TipoParticipantes.SIN_CLASIFICAR,
+        help_text='Indica si compiten clubes o selecciones. El formato y el país no determinan este tipo.')
     temporada = models.CharField(max_length=50)
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.BORRADOR)
     demo_clave = models.CharField(max_length=50, unique=True, null=True, blank=True, editable=False)

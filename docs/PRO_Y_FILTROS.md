@@ -43,7 +43,7 @@ calendario del dispositivo desde el backend ni envía correos automáticos.
 ## Filtros gratuitos, incluidos los torneos con grupos
 
 `GET /api/torneos/` admite `buscar`, `temporada`, `formato`, `estado` y el filtro
-`pais` existente. `formato` acepta `LIGA` o `GRUPOS_ELIMINATORIA`. No se deduce
+`pais` existente. `tipo_participantes` acepta `CLUBES`, `SELECCIONES` o `SIN_CLASIFICAR`, independientemente del formato. `formato` acepta `LIGA` o `GRUPOS_ELIMINATORIA`. No se deduce
 que un torneo sea un Mundial o que sea internacional solo por no tener país.
 
 1. Elegir una competición de la lista real, por ejemplo una Copa del Mundo que
@@ -57,13 +57,12 @@ que un torneo sea un Mundial o que sea internacional solo por no tener país.
 en ese torneo. No incluye eliminatorias ni equipos de otro torneo. Cada partido
 incluye el campo adicional `grupo` (nulo cuando no corresponde).
 
-En Django, configurar el formato Grupos y Eliminatoria, las fases de tipo GRUPOS
+En Django, seleccionar el tipo de participantes (clubes o selecciones), configurar el formato Grupos y Eliminatoria, las fases de tipo GRUPOS
 o ELIMINATORIA e inscribir los equipos asignando su grupo en EquipoTorneo. No se
 crean calendarios, selecciones ni resultados oficiales automáticamente.
 
-Esta entrega no necesita migraciones. No modifica el precio ni el proveedor de
+La migración 0012 añade únicamente tipo_participantes a Torneo. Los torneos existentes conservan sus IDs, equipos y resultados y quedan SIN_CLASIFICAR para que el administrador indique su categoría real. Respaldar PostgreSQL antes de aplicar la migración. No modifica el precio ni el proveedor de
 pagos. La compra PRO sigue por la app móvil; la web añade las herramientas.
-El código móvil se debe integrar y compilar en su repositorio; publicar el backend
-no añade automáticamente controles nuevos a una app ya instalada.
+El alcance móvil de esta entrega es el backend compartido: las capacidades y los filtros se consumen desde la app con JWT. Publicar el backend no añade automáticamente controles nuevos a una app ya instalada.
 
 Formato de calendario: [RFC 5545](https://www.rfc-editor.org/rfc/rfc5545).

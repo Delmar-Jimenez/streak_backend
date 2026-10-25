@@ -16,7 +16,7 @@ class TorneoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Torneo
-        fields = ('id', 'nombre', 'formato', 'temporada', 'estado', 'demo_clave', 'pais', 'pais_detalle')
+        fields = ('id', 'nombre', 'formato', 'temporada', 'estado', 'demo_clave', 'pais', 'pais_detalle', 'tipo_participantes')
 
 
 class EquipoSerializer(serializers.ModelSerializer):

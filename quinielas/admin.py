@@ -33,8 +33,8 @@ class FaseInline(admin.TabularInline):
 
 @admin.register(Torneo)
 class TorneoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'pais', 'formato', 'temporada', 'estado')
-    list_filter = ('pais', 'estado', 'formato', 'temporada')
+    list_display = ('nombre', 'tipo_participantes', 'pais', 'formato', 'temporada', 'estado')
+    list_filter = ('tipo_participantes', 'pais', 'estado', 'formato', 'temporada')
     search_fields = ('nombre', 'temporada')
     inlines = (FaseInline,)
 
