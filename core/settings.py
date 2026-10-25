@@ -51,7 +51,7 @@ MIDDLEWARE = [
 ]
 ROOT_URLCONF = 'core.urls'
 TEMPLATES = [{
-    'BACKEND': 'django.template.backends.django.DjangoTemplates', 'DIRS': [], 'APP_DIRS': True,
+    'BACKEND': 'django.template.backends.django.DjangoTemplates', 'DIRS': [BASE_DIR / 'templates'], 'APP_DIRS': True,
     'OPTIONS': {'context_processors': [
         'django.template.context_processors.request', 'django.contrib.auth.context_processors.auth',
         'django.contrib.messages.context_processors.messages',
@@ -124,7 +124,10 @@ STRIPE_PRO_AMOUNT = int(os.getenv('STRIPE_PRO_AMOUNT', '500'))
 STRIPE_CURRENCY = os.getenv('STRIPE_CURRENCY', 'usd').lower()
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',),
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated', 'quinielas.permissions.IsPasswordNotTemporal',
     ),
