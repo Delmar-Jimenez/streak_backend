@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 {% load static %}
 {% block title %}{{ title }} | STREAK · Administración{% endblock %}
-{% block branding %}<div id="site-name"><a href="{% url 'admin:index' %}">STREAK · Administración</a></div>{% endblock %}
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'quinielas/portal-admin.css' %}">{% endblock %}
+{% block branding %}<div id="site-name"><a class="admin-brand" href="{% url 'admin:index' %}"><span class="streak-logo"><img src="{% static 'quinielas/streak-logo.jpeg' %}" alt="" width="1080" height="1350"></span>STREAK · Administración</a></div>{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="icon" href="{% static 'quinielas/streak-logo.jpeg' %}" type="image/jpeg"><link rel="stylesheet" href="{% static 'quinielas/portal-admin.css' %}"><link rel="stylesheet" href="{% static 'quinielas/streak-logo.css' %}">{% endblock %}
 {% block nav-global %}<a class="portal-return" href="/#administracion">← Volver a STREAK</a>{% endblock %}

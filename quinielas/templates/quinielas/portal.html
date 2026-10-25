@@ -7,15 +7,16 @@
   <meta name="theme-color" content="#123e31">
   <meta name="description" content="Vive cada partido con STREAK. Crea tu quiniela, invita a tus amigos y lleva tus pronósticos a lo más alto.">
   <title>STREAK · Tu juego, tu comunidad</title>
-  <link rel="icon" href="{% static 'quinielas/portal-mark.svg' %}" type="image/svg+xml">
+  <link rel="icon" href="{% static 'quinielas/streak-logo.jpeg' %}" type="image/jpeg">
   <link rel="stylesheet" href="{% static 'quinielas/portal.css' %}">
+  <link rel="stylesheet" href="{% static 'quinielas/streak-logo.css' %}">
   <script src="{% static 'quinielas/portal.js' %}" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#contenido">Saltar al contenido</a>
   <div class="app-shell">
     <aside class="sidebar" aria-label="Navegación principal">
-      <a class="brand" href="#inicio" aria-label="STREAK, inicio"><img src="{% static 'quinielas/portal-mark.svg' %}" alt="" width="33" height="36">STREAK<span>®</span></a>
+      <a class="brand" href="#inicio" aria-label="STREAK, inicio"><span class="streak-logo"><img id="streak-logo-image" src="{% static 'quinielas/streak-logo.jpeg' %}" alt="" width="1080" height="1350"></span>STREAK</a>
       <span class="nav-caption">TU ZONA DE JUEGO</span>
       <nav id="navigation"></nav>
       <div class="sidebar-bottom"><span class="live-dot"></span> EL FÚTBOL NOS UNE<p>Un partido. Mil maneras de vivirlo.</p><a href="#reglas">Cómo se juega <span aria-hidden="true">↗</span></a></div>

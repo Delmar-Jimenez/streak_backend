@@ -1,0 +1,5 @@
+/* Frame the supplied artwork without modifying the original image. */
+.streak-logo,.brand .streak-logo{display:inline-block;position:relative;width:36px;height:38px;flex-shrink:0;overflow:hidden;border-radius:6px;align-self:center}
+.streak-logo img,.brand .streak-logo img{position:absolute;max-width:none;width:136.364%;height:162.651%;left:-22.727%;top:-26.506%;object-fit:fill}
+.admin-brand{display:inline-flex;align-items:center;gap:10px}
+@media(max-width:520px){.brand .streak-logo{width:28px;height:29px}}
