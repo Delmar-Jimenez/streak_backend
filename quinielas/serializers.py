@@ -16,7 +16,7 @@ class TorneoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Torneo
-        fields = ('id', 'nombre', 'formato', 'temporada', 'estado', 'demo_clave', 'pais', 'pais_detalle')
+        fields = ('id', 'nombre', 'formato', 'temporada', 'estado', 'demo_clave', 'pais', 'pais_detalle', 'tipo_participantes')
 
 
 class EquipoSerializer(serializers.ModelSerializer):
@@ -50,8 +50,18 @@ class FaseSerializer(serializers.ModelSerializer):
 
 
 class PartidoSerializer(serializers.ModelSerializer):
+    grupo = serializers.SerializerMethodField()
     equipo_local_detalle = serializers.SerializerMethodField()
     equipo_visita_detalle = serializers.SerializerMethodField()
+
+    def get_grupo(self, obj):
+        if obj.fase.tipo != 'GRUPOS':
+            return None
+        def group(team):
+            return next(((entry.grupo or '').strip().upper() for entry in team.inscripciones_torneos.all()
+                         if entry.torneo_id == obj.torneo_id), '')
+        local, visita = group(obj.equipo_local), group(obj.equipo_visita)
+        return local if local and local == visita else None
 
     def get_equipo_local_detalle(self, obj):
         return EquipoSerializer(obj.equipo_local, context={**self.context, 'torneo_id': obj.torneo_id}).data

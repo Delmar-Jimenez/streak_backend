@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.db.models import Q
+from django.db.models.functions import Trim, Upper
 from django.conf import settings
 from datetime import timedelta
 from django.shortcuts import get_object_or_404
@@ -9,6 +10,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .errors import BusinessError
+from .plans import FEATURES, capacidades
 from .models import Torneo, Partido, Quiniela, Participante, Pronostico, Pago, Equipo, Pais
 from .serializers import (
     TorneoSerializer, PartidoSerializer, QuinielaSerializer, PronosticoSerializer,
@@ -69,6 +71,25 @@ def filtrar_partidos(request, torneo):
             raise BusinessError('FASE_INVALIDA', 'La fase debe ser un identificador valido.')
         get_object_or_404(torneo.fases, pk=fase_id)
         partidos = partidos.filter(fase_id=fase_id)
+    grupo = request.query_params.get('grupo')
+    if grupo is not None:
+        if not grupo.strip() or len(grupo) > 50:
+            raise BusinessError('GRUPO_INVALIDO', 'Selecciona un grupo válido.')
+        inscritos = torneo.inscripciones_equipos.annotate(grupo_normalizado=Upper(Trim('grupo'))).filter(
+            grupo_normalizado=grupo.strip().upper()).values('equipo_id')
+        if not inscritos.exists():
+            raise BusinessError('GRUPO_INVALIDO', 'Este grupo no pertenece al torneo.')
+        partidos = partidos.filter(fase__tipo='GRUPOS', equipo_local_id__in=inscritos, equipo_visita_id__in=inscritos)
+    equipo = request.query_params.get('equipo')
+    if equipo is not None:
+        try:
+            equipo_id = int(equipo)
+            if not 0 < equipo_id < 2**63:
+                raise ValueError
+        except ValueError:
+            raise BusinessError('EQUIPO_INVALIDO', 'Selecciona un equipo válido.')
+        get_object_or_404(torneo.equipos, pk=equipo_id)
+        partidos = partidos.filter(Q(equipo_local_id=equipo_id) | Q(equipo_visita_id=equipo_id))
     return partidos
 
 
@@ -88,7 +109,31 @@ def estado_pronostico(pronostico, partido, es_propio, ahora):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def torneo_list(request):
-    return Response(TorneoSerializer(filtrar_pais(request, torneos_visibles()).order_by('id'), many=True).data)
+    tournaments = filtrar_pais(request, torneos_visibles())
+    for field, choices in [('formato', Torneo.Formato.values), ('estado', ['ACTIVO', 'FINALIZADO']),
+                           ('tipo_participantes', Torneo.TipoParticipantes.values)]:
+        value = request.query_params.get(field)
+        if value is not None:
+            if value not in choices:
+                raise BusinessError('FILTRO_INVALIDO', f'El filtro {field} no es válido.')
+            tournaments = tournaments.filter(**{field: value})
+    if 'temporada' in request.query_params:
+        tournaments = tournaments.filter(temporada=request.query_params['temporada'])
+    if 'buscar' in request.query_params:
+        tournaments = tournaments.filter(nombre__icontains=request.query_params['buscar'].strip())
+    return Response(TorneoSerializer(tournaments.order_by('id'), many=True).data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def torneo_filtros(request, pk):
+    torneo = get_object_or_404(torneos_visibles(), pk=pk)
+    groups = torneo.inscripciones_equipos.exclude(grupo__isnull=True).exclude(grupo='').values_list('grupo', flat=True)
+    return Response({'torneo': torneo.pk, 'formato': torneo.formato, 'tipo_participantes': torneo.tipo_participantes,
+        'fases': FaseSerializer(torneo.fases.all(), many=True).data,
+        'grupos': sorted({g.strip().upper() for g in groups if g.strip()}),
+        'equipos': list(torneo.equipos.order_by('nombre', 'id').values('id', 'nombre')),
+        'estados': [{'valor': value, 'nombre': str(label)} for value, label in Partido.Estado.choices]})
 
 
 @api_view(['GET'])
@@ -316,11 +361,14 @@ def quiniela_rival_pronosticos(request, pk, participante_id):
 
 @api_view(['GET'])
 def pro_estado(request):
-    return Response({'es_pro': request.user.es_pro, 'plan': {
+    response = Response({'es_pro': request.user.es_pro, 'capacidades': capacidades(request.user), 'plan': {
         'monto_centavos': settings.STRIPE_PRO_AMOUNT, 'moneda': settings.STRIPE_CURRENCY,
         'tipo': 'PAGO_UNICO', 'modo_prueba': not settings.STRIPE_LIVE_MODE,
         'max_participantes': 100, 'max_participantes_gratis': 50,
+        'beneficios': FEATURES,
     }})
+    response['Cache-Control'] = 'private, no-store'
+    return response
 
 
 @api_view(['GET'])

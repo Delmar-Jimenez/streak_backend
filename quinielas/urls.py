@@ -10,6 +10,7 @@ from .views_auth import (
 )
 from . import views_api 
 from . import views_payments
+from . import views_insights
 
 routes = [
     
@@ -28,6 +29,7 @@ routes = [
     ('torneos/<int:pk>/', views_api.torneo_detail, 'torneo_detail'),
     ('torneos/<int:pk>/equipos/', views_api.torneo_equipos, 'torneo_equipos'),
     ('torneos/<int:pk>/fases/', views_api.torneo_fases, 'torneo_fases'),
+    ('torneos/<int:pk>/filtros/', views_api.torneo_filtros, 'torneo_filtros'),
     ('partidos/<int:pk>/', views_api.partido_detail, 'partido_detail'),
     ('torneos/<int:pk>/partidos/', views_api.torneo_partidos, 'torneo_partidos'),
     
@@ -45,6 +47,10 @@ routes = [
     ('quinielas/validar-codigo/', views_api.quiniela_validar_codigo, 'quiniela_validar_codigo'),
     ('quinielas/<int:pk>/pronosticos/', views_api.quiniela_pronosticos, 'quiniela_pronosticos'),
     ('pro/estado/', views_api.pro_estado, 'pro_estado'),
+    ('pro/estadisticas/', views_insights.estadisticas, 'pro_estadisticas'),
+    ('pro/pronosticos/exportar/', views_insights.exportar_pronosticos, 'pro_exportar_pronosticos'),
+    ('quinielas/<int:pk>/tabla/exportar/', views_insights.exportar_tabla, 'pro_exportar_tabla'),
+    ('pro/calendario/', views_insights.calendario, 'pro_calendario'),
     ('pro/suscribir/', views_payments.pro_suscribir, 'pro_suscribir'),
     ('pro/pagos/', views_api.pro_pagos, 'pro_pagos'),
     ('pro/pago-pendiente/', views_payments.pro_pago_pendiente, 'pro_pago_pendiente'),
