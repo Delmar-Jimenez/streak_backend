@@ -1,0 +1,6 @@
+{% extends "admin/base.html" %}
+{% load static %}
+{% block title %}{{ title }} | STREAK · Administración{% endblock %}
+{% block branding %}<div id="site-name"><a href="{% url 'admin:index' %}">STREAK · Administración</a></div>{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'quinielas/portal-admin.css' %}">{% endblock %}
+{% block nav-global %}<a class="portal-return" href="/#administracion">← Volver a STREAK</a>{% endblock %}

@@ -1,0 +1,33 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#123e31">
+  <meta name="description" content="Vive cada partido con STREAK. Crea tu quiniela, invita a tus amigos y lleva tus pronósticos a lo más alto.">
+  <title>STREAK · Tu juego, tu comunidad</title>
+  <link rel="icon" href="{% static 'quinielas/portal-mark.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'quinielas/portal.css' %}">
+  <script src="{% static 'quinielas/portal.js' %}" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Navegación principal">
+      <a class="brand" href="#inicio" aria-label="STREAK, inicio"><img src="{% static 'quinielas/portal-mark.svg' %}" alt="" width="33" height="36">STREAK<span>®</span></a>
+      <span class="nav-caption">TU ZONA DE JUEGO</span>
+      <nav id="navigation"></nav>
+      <div class="sidebar-bottom"><span class="live-dot"></span> EL FÚTBOL NOS UNE<p>Un partido. Mil maneras de vivirlo.</p><a href="#reglas">Cómo se juega <span aria-hidden="true">↗</span></a></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar"><div><span class="eyebrow">BIENVENIDO A STREAK</span><strong id="page-label">Centro de juego</strong></div><div class="topbar-right"><span class="today" id="today"></span><div id="account-actions"></div></div></header>
+      <main id="contenido" tabindex="-1"><div class="loading"><span class="spinner"></span>Cargando tu zona de juego…</div></main>
+      <footer class="site-footer"><span>STREAK <span class="muted">· Hecho para compartir el fútbol.</span></span><a href="#reglas">Reglas de puntuación</a></footer>
+    </div>
+  </div>
+  <dialog id="modal" aria-labelledby="modal-title"><button class="modal-close icon-button" type="button" data-action="close-modal" aria-label="Cerrar ventana">×</button><div id="modal-body"></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <noscript><div class="noscript">Activa JavaScript para usar STREAK. La <a href="/admin/">administración de Django</a> también está disponible.</div></noscript>
+</body>
+</html>

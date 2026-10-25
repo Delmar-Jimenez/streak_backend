@@ -1,0 +1,7 @@
+:root { --primary:#255b46; --secondary:#123e31; --accent:#cef866; --link-fg:#26714f; --link-selected-fg:#123e31; --button-bg:#255b46; --button-hover-bg:#123e31; --default-button-bg:#123e31; }
+#header { background:#123e31; padding:22px 28px; gap:20px; flex-wrap:wrap; }
+#branding #site-name a { font-weight:800; letter-spacing:-.5px; color:white; }
+.portal-return { font-weight:600; padding:9px 15px; border:1px solid #719a88; border-radius:8px; }
+div.breadcrumbs { background:#245441; }
+.module h2,.module caption { border-radius:6px 6px 0 0; }
+@media(prefers-color-scheme:dark) { :root { --link-fg:#9cdcaf; --link-selected-fg:#cef866; } }
